@@ -1,149 +1,142 @@
-// // Saves options to chrome.storage
-// function save_options()
-// {
-//     var color = document.getElementById('color').value;
-//     var likesColor = document.getElementById('like').checked;
-//     chrome.storage.sync.set({
-//         favoriteColor: color,
-//         likesColor: likesColor
-//     }, function ()
-//     {
-//         // Update status to let user know options were saved.
-//         var status = document.getElementById('status');
-//         status.textContent = 'Options saved.';
-//         setTimeout(function ()
-//         {
-//             status.textContent = '';
-//         }, 750);
-//     });
-// }
+import { reactive, watch } from "vue";
 
-var inputDepth: HTMLInputElement;
-var inputThreads: HTMLInputElement;
-var inputShowHints: HTMLInputElement;
-var inputMoveAnalysis: HTMLInputElement;
-var inputDepthBar: HTMLInputElement;
-var inputEvalBar: HTMLInputElement;
-var inputAutoMove: HTMLInputElement;
-var inputUseNNUE: HTMLInputElement;
+// return true to stop listening for updates
+type FuncOptsCallback = { (): boolean | void };
 
-const DefaultExtensionOptions: ExtensionOptions = {
-    depth: 15,
-    threads: 2,
-    show_hints: true,
-    move_analysis: true,
-    depth_bar: true,
-    evaluation_bar: true,
-    use_nnue: false,
-    auto_move: false,
+export interface IOptions {
+    showArrows: boolean;
+    showClassification: boolean;
+    showEvalBar: boolean;
+    showEvalLines: boolean;
+    showFeedback: boolean;
+    multiPv: number;
+
+    engineDepth: number;
+    engineThreads: number;
+    engineHash: number;
+    engineUseExternal: boolean;
+    engineExternalPort: number;
 }
 
+const hasChromeStorageAccess = chrome && chrome.storage && chrome.storage.sync;
+const hasChromeTabsAccess = hasChromeStorageAccess && chrome.tabs;
+let onUpdateCallbacks: FuncOptsCallback[] = [];
 
-function RestoreOptions()
-{
-    chrome.storage.sync.get(DefaultExtensionOptions, function (opts)
-    {
-        let options = opts as ExtensionOptions;
-        inputDepth.value = options.depth.toString();
-        inputThreads.value = options.threads.toString();
-        inputShowHints.checked = options.show_hints;
-        inputMoveAnalysis.checked = options.move_analysis;
-        inputDepthBar.checked = options.depth_bar;
-        inputEvalBar.checked = options.evaluation_bar;
-        inputUseNNUE.checked = options.use_nnue;
-        inputAutoMove.checked = options.auto_move;
+// default options
+export const options = reactive<IOptions>({
+    showArrows: true,
+    showClassification: true,
+    showEvalBar: true,
+    showEvalLines: true,
+    showFeedback: true,
+    multiPv: 3,
 
-        let event = new CustomEvent("input");
-        (event as any).disableUpdate = true;
-        inputDepth.dispatchEvent(event);
-        inputThreads.dispatchEvent(event);
-    });
+    engineDepth: 15,
+    engineThreads: 4,
+    engineHash: 1024,
+    engineUseExternal: false,
+    engineExternalPort: 8000,
+});
+
+function setOptions(opts: IOptions) {
+    // options = opts will make it lose the reactivity
+    Object.assign(options, opts);
 }
 
-function OnOptionsChange()
-{
-    let options: ExtensionOptions = {
-        depth: parseInt(inputDepth.value),
-        threads: parseInt(inputThreads.value),
-        show_hints: inputShowHints.checked,
-        move_analysis: inputMoveAnalysis.checked,
-        depth_bar: inputDepthBar.checked,
-        evaluation_bar: inputEvalBar.checked,
-        use_nnue: inputUseNNUE.checked,
-        auto_move: inputAutoMove.checked,
+export function requestOptions(callback?: { (): void }) {
+
+    if (hasChromeStorageAccess) {
+        chrome.storage.sync.get<IOptions>(options, function (opts) {
+            setOptions(opts);
+            if (callback) callback();
+        });
+
+    } else {
+        if (callback) {
+            const listerner = () => {
+                callback();
+                window.removeEventListener("ChessMintUpdateOptions", listerner);
+            };
+            window.addEventListener("ChessMintUpdateOptions", listerner);
+        }
+
+        window.dispatchEvent(new CustomEvent("ChessMintRequestOptions"));
+    }
+}
+
+// callback should return true to stop listening for updates
+export function onOptionsUpdated(callback: FuncOptsCallback) {
+    onUpdateCallbacks.push(callback);
+}
+
+// Must be called in the content script to handle options
+// updates from the popup
+export function optionsRegisterContentScript() {
+
+    if (!hasChromeStorageAccess) {
+        throw "method should only be called from content script";
     }
 
-    chrome.storage.sync.set(options);
+    requestOptions();
 
-    chrome.tabs.query({}, function (tabs)
-    {
-        tabs.forEach(function (tab)
-        {
-            chrome.tabs.sendMessage(tab.id as number, { type: "UpdateOptions", data: options });
-        })
-    });
-    // chrome.tabs.query({ active: true, currentWindow: true }, function (tabs)
-    // {
-    //     if (tabs[0].id === undefined) return;
+    // send options to injected script
+    function dispatchOptions() {
+        window.dispatchEvent(
+            new CustomEvent("ChessMintUpdateOptions", {
+                detail: Object.assign({}, options),
+            })
+        );
+    }
 
-    //     chrome.tabs.sendMessage(tabs[0].id, { type: "getText" }, function (response)
-    //     {
-    //         alert(response)
-    //     });
-    // });
-}
-
-function InitOptions()
-{
-    inputDepth = document.getElementById("option-depth") as HTMLInputElement;
-    inputThreads = document.getElementById("option-threads") as HTMLInputElement;
-    inputShowHints = document.getElementById("option-show-hints") as HTMLInputElement;
-    inputMoveAnalysis = document.getElementById("option-move-analysis") as HTMLInputElement;
-    inputDepthBar = document.getElementById("option-depth-bar") as HTMLInputElement;
-    inputEvalBar = document.getElementById("option-evaluation-bar") as HTMLInputElement;
-    inputUseNNUE = document.getElementById("option-use-nnue") as HTMLInputElement;
-    inputAutoMove = document.getElementById("option-auto-move") as HTMLInputElement;
-
-    const sliderProps = {
-        fill: "#2CA137",
-        background: "rgba(255, 255, 255, 0.214)",
-    };
-
-
-    document.querySelectorAll(".options-slider").forEach(function (slider)
-    {
-        const title = slider.querySelector(".title");
-        const input = slider.querySelector("input");
-        if (title == null || input == null) return;
-
-        input.min = slider.getAttribute("data-min") as string;
-        input.max = slider.getAttribute("data-max") as string;
-
-        input.addEventListener("input", (event: Event) =>
-        {
-            const value = parseInt(input.value);
-            const minValue = parseInt(input.min);
-            const maxValue = parseInt(input.max);
-            const percent = (value - minValue) / (maxValue - minValue) * 100;
-            const bg = `linear-gradient(90deg, ${sliderProps.fill} ${percent}%, ${sliderProps.background} ${percent + 0.1}%)`;
-
-            input.style.background = bg;
-            title.setAttribute("data-value", input.value);
-
-            if (!(event as any).disableUpdate)
-                OnOptionsChange();
-        });
+    onOptionsUpdated(() => {
+        dispatchOptions();
     })
 
-    document.querySelectorAll(".options-checkbox").forEach(function (checkbox)
-    {
-        checkbox.addEventListener("change", function ()
-        {
-            OnOptionsChange();
-        });
+    // from popup to content script
+    chrome.runtime.onMessage.addListener((request: IOptions) => {
+        setOptions(request);
     });
 
-    RestoreOptions();
+    // from injected script to content script
+    window.addEventListener("ChessMintRequestOptions", dispatchOptions);
 }
 
-document.addEventListener('DOMContentLoaded', InitOptions);
+// Must be called in the inject script to handle options
+// updates from the content script
+export function optionsRegisterInjectedScript(callback?: { (): void }) {
+    if (hasChromeStorageAccess) {
+        throw "method should only be called from injected script";
+    }
+
+    // from content script to injected script
+    window.addEventListener(
+        "ChessMintUpdateOptions",
+        (event: CustomEventInit<IOptions>) => {
+            setOptions(event.detail!);
+        }
+    );
+
+    requestOptions(callback);
+}
+
+watch(options, (first, second) => {
+    onUpdateCallbacks = onUpdateCallbacks.filter(
+        (callback) => callback() !== true
+    );
+
+    // only update the storage from popup
+    if (hasChromeTabsAccess) {
+        chrome.storage.sync.set(options);
+        chrome.tabs.query({}, function (tabs) {
+            tabs.forEach(function (tab) {
+                if (tab.id) {
+                    chrome.tabs.sendMessage<IOptions>(
+                        tab.id,
+                        Object.assign({}, options)
+                    ).catch(() => {})
+                }
+            });
+        });
+    }
+
+});

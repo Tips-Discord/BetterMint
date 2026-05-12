@@ -3,15 +3,12 @@
     "configurations": [
         {
             "type": "chrome",
-            "request": "attach",
-            "name": "ChessMint debugger",
-            "port": 9992,
-            "url": "https://www.chess.com/*",
-            "webRoot": "${workspaceFolder}/dist",
-            "preLaunchTask": "tsc: build - tsconfig.json",
-            "sourceMaps": true,
-            "outFiles": [
-                "${workspaceRoot}/dist/js/*.js"
+            "request": "launch",
+            "name": "Launch Chrome against localhost",
+            "url": "https://chess.com/play/computer",
+            "webRoot": "${workspaceFolder}",
+            "runtimeArgs": [
+                "--load-extension=${workspaceFolder}/dist"
             ],
         }
     ]
