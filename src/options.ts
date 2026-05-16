@@ -20,6 +20,7 @@ export interface IOptions {
     enginePonder: boolean;
 
     enableAutoMove: boolean;
+    autoMoveDelay: number;
 }
 
 const hasChromeStorageAccess = chrome && chrome.storage && chrome.storage.sync;
@@ -44,6 +45,7 @@ export const options = reactive<IOptions>({
     enginePonder: false,
 
     enableAutoMove: false,
+    autoMoveDelay: 1000,
 });
 
 function setOptions(opts: IOptions) {

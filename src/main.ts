@@ -81,10 +81,12 @@ class ChessMint {
             }
 
             if (options.enableAutoMove) {
-                const from = lan.substring(0, 2);
-                const to = lan.substring(2, 4);
-                const promotion = lan.length > 4 ? lan.substring(4, 5) : undefined;
-                new AutomaticMove([from, to, promotion as string]).execute().catch(() => {});
+                setTimeout(() => {
+                    const from = lan.substring(0, 2);
+                    const to = lan.substring(2, 4);
+                    const promotion = lan.length > 4 ? lan.substring(4, 5) : undefined;
+                    new AutomaticMove([from, to, promotion as string]).execute().catch(() => {});
+                }, options.autoMoveDelay);
             }
         }
     }
