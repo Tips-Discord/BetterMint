@@ -29,22 +29,31 @@ export interface IPrincipalVariation extends IEnginePv {
     lineSan: TSANotation[];
 }
 
-let convertEnginePv = (fen: string, pv: IEnginePv): IPrincipalVariation => {
-    
-    const chess = new Chess();
-    chess.load(fen);
+let convertEnginePv = (() => {
+    let chess: Chess | null = null;
+    let lastFen = '';
 
-    const lineSan = pv.line.map((san) => {
-        const move = chess.move(san)
-        return move.san;
-    })
+    return (fen: string, pv: IEnginePv): IPrincipalVariation => {
+        if (!chess || lastFen !== fen) {
+            chess = new Chess();
+            chess.load(fen);
+            lastFen = fen;
+        }
 
-    return {
-        ...pv,
-        san: lineSan[0],
-        lineSan: lineSan,
+        const moveCount = pv.line.length;
+        const lineSan = pv.line.map(san => chess!.move(san).san);
+
+        for (let i = 0; i < moveCount; i++) {
+            chess!.undo();
+        }
+
+        return {
+            ...pv,
+            san: lineSan[0],
+            lineSan: lineSan,
+        };
     };
-};
+})();
 
 export class Line {
     public readonly pvs: IPrincipalVariation[];
