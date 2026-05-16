@@ -1,5 +1,10 @@
 import { onOptionsUpdated, options } from "./options";
 import { WsBridge } from "./extension/ws-bridge";
+import { WorkerBridge } from "./extension/worker-bridge";
+import stockfishMultiSrc from "./assets/stockfish/stockfish-18-lite.js?raw";
+import stockfishSingleSrc from "./assets/stockfish/stockfish-18-lite-single.js?raw";
+import wasmMultiUrl from "./assets/stockfish/stockfish-18-lite.wasm?inline";
+import wasmSingleUrl from "./assets/stockfish/stockfish-18-lite-single.wasm?inline";
 
 export interface IEnginePv {
     lan: TLANotation;
@@ -27,12 +32,10 @@ const REGEX_BESTMOVE = /^bestmove (?<bestmove>[a-h][1-8][a-h][1-8][qrbn]?)?/;
 const REGEX_PV =
     /^info depth (?<depth>\d+) seldepth (?<seldepth>\d+) multipv (?<multipv>\d+) score (?<scoreType>cp|mate) (?<score>-?\d+) nodes (?<nodes>-?\d+) nps (?<nps>\d+)(?:.*?) pv (?<pv>.+)/;
 
-// chess.com hook Worker, this is to avoid it from happening
-const OriginalWorker = window.Worker;
 
 export class Engine {
     private readonly handler: IEngineHandler;
-    private worker!: Worker | WebSocket | WsBridge;
+    private worker!: Worker | WebSocket | WsBridge | WorkerBridge;
     private currentMoveNumber: number = 0;
     private isLoaded: boolean;
     private isReady: boolean;
@@ -46,10 +49,25 @@ export class Engine {
     private reconnectTimer?: ReturnType<typeof setTimeout>;
     private externalUrl: string = "";
 
-    constructor(handler: IEngineHandler) {
-        let stockfishJsURL: string;
-        let stockfishPathConfig = (window as any).Config?.stockfish16_1?.lite;
+    private resolveStockfishUrl(): string {
+        const supportsThreads = (() => {
+            try { new SharedArrayBuffer(1024); return true; }
+            catch { return false; }
+        })();
 
+        const src = supportsThreads ? stockfishMultiSrc : stockfishSingleSrc;
+        const wasmDataUrl = (supportsThreads ? wasmMultiUrl : wasmSingleUrl)
+            .replace('application/wasm', 'application/octet-stream');
+
+        const patched = src.replace(
+            /['"]stockfish\.wasm['"]/,
+            `'${wasmDataUrl}'`
+        );
+
+        return URL.createObjectURL(new Blob([patched], { type: 'application/javascript' }));
+    }
+
+    constructor(handler: IEngineHandler) {
         this.handler = handler;
         this.isLoaded = false;
         this.isReady = false;
@@ -66,32 +84,30 @@ export class Engine {
             this.connectExternal();
 
         } else {
-            // the multiThreaded NNUE engine needs the browser to support SharedArrayBuffer
-            try {
-                new SharedArrayBuffer(1024);
-                stockfishJsURL = stockfishPathConfig.multiThreaded.loader;
-            } catch (e) {
-                stockfishJsURL = stockfishPathConfig.singleThreaded.loader;
-            }
-    
-            try {
-                this.worker = new OriginalWorker(stockfishJsURL);
-                this.worker.onmessage = (e) => {
-                    this.processMessage(e);
-                };
-    
-            } catch (e) {
-                alert("Failed to load stockfish");
-                throw e;
-            }
-
-            this.send("uci");
-            this.updateOptions();
+            this.initBuiltinWorker();
         }
 
         onOptionsUpdated(() => {
             this.updateOptions();
         });
+    }
+
+    private initBuiltinWorker() {
+        const url = this.resolveStockfishUrl();
+        if (!url) return; // content script hasn't prepared the blob URL yet
+
+        try {
+            this.worker = new WorkerBridge(url);
+            this.worker.onmessage = (e) => {
+                this.processMessage(e);
+            };
+        } catch (e) {
+            alert("Failed to load stockfish");
+            throw e;
+        }
+
+        this.send("uci");
+        this.updateOptions();
     }
 
     private connectExternal() {
@@ -136,6 +152,10 @@ export class Engine {
     }
 
     public go(lanMoves: TLANotation[], depth: number = options.engineDepth) {
+        if (!this.worker) {
+            this.initBuiltinWorker();
+        }
+
         let fn = () => {
             this.isEvaluating = true;
             this.currentMoveNumber = lanMoves.length - 1;
@@ -177,7 +197,10 @@ export class Engine {
     }
 
     private send(cmd: string): void {
-        if (this.worker instanceof Worker) {
+        if (!this.worker) return;
+        if (this.worker instanceof WorkerBridge) {
+            this.worker.postMessage(cmd);
+        } else if (this.worker instanceof Worker) {
             this.worker.postMessage(cmd);
         } else if (this.worker.readyState === WebSocket.OPEN) {
             this.worker.send(cmd);

@@ -172,6 +172,14 @@ export default (env: { [index: string]: boolean }) => {
                     type: "asset/source",
                 },
                 {
+                    resourceQuery: /raw/,
+                    type: "asset/source",
+                },
+                {
+                    resourceQuery: /inline/,
+                    type: "asset/inline",
+                },
+                {
                     test: /\.(png|jpe?g|gif)$/i,
                     type: "asset/resource",
                     generator: {
