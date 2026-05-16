@@ -22,6 +22,9 @@ import { options } from "@/options";
     <SettingsRow v-if="options.engineUseExternal" label="External engine port">
         <SettingsNumber v-model="options.engineExternalPort" :min="1" :max="65535" :step="1"/>
     </SettingsRow>
+    <SettingsRow label="Ponder">
+        <SettingsCheckBox v-model="options.enginePonder"/>
+    </SettingsRow>
     <SettingsRow label="Disable minimum MultiPV">
         <SettingsCheckBox v-model="options.engineDisableMinOptions"/>
     </SettingsRow>

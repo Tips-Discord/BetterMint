@@ -200,7 +200,7 @@ export class Engine {
     private updateOptions() {
         this.options["Hash"] = options.engineHash;
         this.options["Threads"] = options.engineThreads;
-        this.options["Ponder"] = true;
+        this.options["Ponder"] = options.enginePonder;
         this.options["MultiPV"] = options.engineDisableMinOptions
             ? options.multiPv
             : Math.max(options.multiPv, MIN_ENGINE_MULTI_PV);

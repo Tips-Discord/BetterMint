@@ -17,6 +17,7 @@ export interface IOptions {
     engineUseExternal: boolean;
     engineExternalPort: number;
     engineDisableMinOptions: boolean;
+    enginePonder: boolean;
 
     enableAutoMove: boolean;
 }
@@ -40,6 +41,7 @@ export const options = reactive<IOptions>({
     engineUseExternal: false,
     engineExternalPort: 8000,
     engineDisableMinOptions: false,
+    enginePonder: false,
 
     enableAutoMove: false,
 });
