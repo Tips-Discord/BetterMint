@@ -5,7 +5,7 @@ import { EClassification, IChessboard } from "./types/chessboard";
 import eco from "./assets/ecotable.json";
 import { onOptionsUpdated, options } from "./options";
 
-const ecoTable = eco as string[];
+const ecoSet = new Set(eco as string[]);
 
 const materialValues: Record<string, number> = {
     p: 1, n: 3, b: 3, r: 5, q: 9,
@@ -68,7 +68,7 @@ export class Line {
     ) {
         const shortFen = fen.split(" ").slice(0, 3).join(" ");
         this.pvs = [];
-        this.isInTheory = ecoTable.find((f) => f.trim() === shortFen.trim()) !== undefined;
+        this.isInTheory = ecoSet.has(shortFen);
         this.fen = fen;
         this.lan = lan;
         this.san = san;
