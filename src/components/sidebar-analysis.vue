@@ -22,8 +22,8 @@ provide("data", data);
 function update(m: number, curLine: Line, prevLine?: Line)
 {
     data.moveNumber = m;
-    data.currentLine = curLine ? Object.assign(Object.create(Object.getPrototypeOf(curLine)), curLine) : undefined;
-    data.previousLine = prevLine ? Object.assign(Object.create(Object.getPrototypeOf(prevLine)), prevLine) : undefined;
+    data.currentLine = curLine;
+    data.previousLine = prevLine;
 }
 
 function mountEvalBar(container?: Element) {
