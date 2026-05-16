@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="350" src="/img/logo-h.png">
+    <img width="350" src="/public/img/logo-h.png">
     <br><br>
     <a href="https://discord.gg/T3PmKS75M2"><img alt="Join ChessMint discord!" src="https://img.shields.io/badge/Discord-ChessMint-0?style=flat&logo=discord"></a>
     <a href="https://github.com/thedemons/ChessMint/releases"><img alt="Download ChessMint" src="https://img.shields.io/github/downloads/thedemons/ChessMint/total?color=%2331c754&label=Download&logo=googlechrome&logoColor=%23ffffff"></a>
@@ -54,7 +54,7 @@ npm i -g typescript
 ``` 
 Clone this repo and build it:
 ```none
-git clone https://github.com/thedemons/ChessMint.git
+git clone https://github.com/Tips-Discord/BetterMint.git
 cd ChessMint
 npm i
 npm run build
