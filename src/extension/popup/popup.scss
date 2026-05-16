@@ -7,7 +7,7 @@
 
 /* custom scrollbar */
 ::-webkit-scrollbar {
-    width: 0.3rem;
+    width: 0.5rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -17,6 +17,7 @@
 ::-webkit-scrollbar-thumb {
     background-color: #7f7f7f;
     background-clip: content-box;
+    border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {

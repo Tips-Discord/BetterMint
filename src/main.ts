@@ -2,7 +2,8 @@ import { Engine, IEnginePv } from './engine';
 import { Position } from './position';
 import { ChessComBoard } from './chesscom/board';
 import { IChessboard } from './types/chessboard';
-import { optionsRegisterInjectedScript } from './options';
+import { options, optionsRegisterInjectedScript } from './options';
+import { AutomaticMove } from './auto-move';
 
 class ChessMint {
     private readonly board: IChessboard;
@@ -10,9 +11,9 @@ class ChessMint {
     private readonly position: Position;
 
     constructor(chessBoard: HTMLElement) {
+        this.engine = new Engine(this);
         this.board = new ChessComBoard(chessBoard, this);
         this.position = new Position(this.board);
-        this.engine = new Engine(this);
     }
 
     // if we reloaded the page and the current line is analysed but not the previous line
@@ -74,8 +75,17 @@ class ChessMint {
     public onBestMoveFound(moveNumber: number, lan: TLANotation) {
         this.position.onBestMoveFound(moveNumber, lan);
 
-        if (moveNumber != -1 && moveNumber == this.position.getCurrentNode()) {
-            this.evaluatePreviousLineIfNeeded(moveNumber);
+        if (moveNumber == this.position.getCurrentNode()) {
+            if (moveNumber != -1) {
+                this.evaluatePreviousLineIfNeeded(moveNumber);
+            }
+
+            if (options.enableAutoMove) {
+                const from = lan.substring(0, 2);
+                const to = lan.substring(2, 4);
+                const promotion = lan.length > 4 ? lan.substring(4, 5) : undefined;
+                new AutomaticMove([from, to, promotion as string]).execute().catch(() => {});
+            }
         }
     }
 }

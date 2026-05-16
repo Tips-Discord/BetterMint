@@ -1,4 +1,5 @@
 import { onOptionsUpdated, options } from "./options";
+import { WsBridge } from "./extension/ws-bridge";
 
 export interface IEnginePv {
     lan: TLANotation;
@@ -31,7 +32,7 @@ const OriginalWorker = window.Worker;
 
 export class Engine {
     private readonly handler: IEngineHandler;
-    private readonly worker: Worker | WebSocket;
+    private worker!: Worker | WebSocket | WsBridge;
     private currentMoveNumber: number = 0;
     private isLoaded: boolean;
     private isReady: boolean;
@@ -41,10 +42,13 @@ export class Engine {
     private bestmoveCallback?: { (): void };
 
     private options: { [opt: string]: string | number | boolean };
+    private reconnectAttempts: number = 0;
+    private reconnectTimer?: ReturnType<typeof setTimeout>;
+    private externalUrl: string = "";
 
     constructor(handler: IEngineHandler) {
         let stockfishJsURL: string;
-        let stockfishPathConfig = (window as any).Config.stockfish16_1.lite;
+        let stockfishPathConfig = (window as any).Config?.stockfish16_1?.lite;
 
         this.handler = handler;
         this.isLoaded = false;
@@ -58,17 +62,9 @@ export class Engine {
 
         if (options.engineUseExternal) {
 
-            this.worker = new WebSocket(
-                `ws://localhost:${options.engineExternalPort}/ws`
-            );
-            this.worker.onmessage = (e) => {
-                this.processMessage(e);
-            }
-            this.worker.onopen = () => {
-                this.send("uci");
-                this.updateOptions();
-            }
-            
+            this.externalUrl = `ws://localhost:${options.engineExternalPort}/ws`;
+            this.connectExternal();
+
         } else {
             // the multiThreaded NNUE engine needs the browser to support SharedArrayBuffer
             try {
@@ -96,6 +92,42 @@ export class Engine {
         onOptionsUpdated(() => {
             this.updateOptions();
         });
+    }
+
+    private connectExternal() {
+        this.worker = new WsBridge(this.externalUrl);
+        this.worker.onmessage = (e) => {
+            this.processMessage(e);
+        }
+        this.worker.onopen = () => {
+            this.reconnectAttempts = 0;
+            this.send("uci");
+            this.updateOptions();
+        }
+        this.worker.onerror = () => {
+            (window as any).toaster?.add?.({
+                id: "chess.com",
+                duration: 5000,
+                icon: "circle-exclamation",
+                content: `Failed to connect to external engine on port ${options.engineExternalPort}`,
+            });
+        }
+        this.worker.onclose = () => {
+            if (this.isLoaded) {
+                (window as any).toaster?.add?.({
+                    id: "chess.com",
+                    duration: 5000,
+                    icon: "circle-exclamation",
+                    content: "External engine disconnected",
+                });
+                this.isLoaded = false;
+                this.isReady = false;
+            }
+
+            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+            this.reconnectAttempts++;
+            this.reconnectTimer = setTimeout(() => this.connectExternal(), delay);
+        }
     }
 
     public newGame() {
@@ -147,8 +179,8 @@ export class Engine {
     private send(cmd: string): void {
         if (this.worker instanceof Worker) {
             this.worker.postMessage(cmd);
-        } else {
-            this.worker.send(cmd)
+        } else if (this.worker.readyState === WebSocket.OPEN) {
+            this.worker.send(cmd);
         }
     }
 
@@ -156,10 +188,9 @@ export class Engine {
         this.options["Hash"] = options.engineHash;
         this.options["Threads"] = options.engineThreads;
         this.options["Ponder"] = true;
-        this.options["MultiPV"] = Math.max(
-            options.multiPv,
-            MIN_ENGINE_MULTI_PV
-        );
+        this.options["MultiPV"] = options.engineDisableMinOptions
+            ? options.multiPv
+            : Math.max(options.multiPv, MIN_ENGINE_MULTI_PV);
 
         Object.keys(this.options).forEach((key) => {
             this.send(`setoption name ${key} value ${this.options[key]}`);

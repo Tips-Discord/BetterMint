@@ -6,6 +6,24 @@ import eco from "./assets/ecotable.json";
 import { onOptionsUpdated, options } from "./options";
 
 const ecoTable = eco as string[];
+
+const materialValues: Record<string, number> = {
+    p: 1, n: 3, b: 3, r: 5, q: 9,
+    P: 1, N: 3, B: 3, R: 5, Q: 9,
+};
+
+function countMaterial(fen: string, color: 'w' | 'b'): number {
+    const placement = fen.split(' ')[0];
+    let count = 0;
+    for (const ch of placement) {
+        if (color === 'w' && ch >= 'A' && ch <= 'Z') {
+            count += materialValues[ch] || 0;
+        } else if (color === 'b' && ch >= 'a' && ch <= 'z') {
+            count += materialValues[ch] || 0;
+        }
+    }
+    return count;
+}
 export interface IPrincipalVariation extends IEnginePv {
     san: TSANotation;
     lineSan: TSANotation[];
@@ -50,7 +68,7 @@ export class Line {
     ) {
         const shortFen = fen.split(" ").slice(0, 3).join(" ");
         this.pvs = [];
-        this.isInTheory = ecoTable.find((f) => f == shortFen) !== undefined;
+        this.isInTheory = ecoTable.find((f) => f.trim() === shortFen.trim()) !== undefined;
         this.fen = fen;
         this.lan = lan;
         this.san = san;
@@ -146,7 +164,7 @@ export class Line {
 
     // return true if we should update analyser
     public updatePv(pv: IEnginePv, previousLine?: Line): boolean {
-        let index = this.pvs.findIndex((otherPv) => otherPv.lan == pv.lan);
+        let index = this.pvs.findIndex((otherPv) => otherPv.lan === pv.lan);
         if (index != -1) {
             this.pvs[index] = convertEnginePv(this.fen, pv);
         } else {
@@ -415,7 +433,11 @@ export class Position {
                 }
             }
 
-            this.analyser.updateLine(moveNumber, line, false, previousLine);
+            const isSacrifice = previousLine
+                ? countMaterial(line.fen, line.side) < countMaterial(previousLine.fen, line.side)
+                : false;
+
+            this.analyser.updateLine(moveNumber, line, isSacrifice, previousLine);
         }
     }
 }

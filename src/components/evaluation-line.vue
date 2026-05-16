@@ -1,17 +1,3 @@
-<template>
-    <div class="evaluation-lines-component evaluation-lines-withicon" :class="{ 'evaluation-lines-open': isExpanded }" :depth="pv.depth">
-        <button @click="expandLine()" type="button" class="evaluation-lines-more" :class="{ 'evaluation-lines-inverted': isExpanded }">
-            <span class="evaluation-lines-icon icon-font-chess caret-down"></span>
-        </button>
-        <a class="evaluation-lines-score" :class="{ 'evaluation-lines-negative': pv.absoluteScore < 0 }">
-            {{ pvEvaluationToString(pv, false) }}
-        </a>
-        <span v-for="(san, index) in pv.lineSan" class="evaluation-lines-node">
-            {{ getSanNode(san, index) }}
-        </span>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { PropType, ref } from 'vue';
 import { IPrincipalVariation } from '@/position';
@@ -57,3 +43,17 @@ function getSanNode(san: TSANotation, index: number)
 }
 
 </script>
+
+<template>
+    <div class="evaluation-lines-component evaluation-lines-withicon" :class="{ 'evaluation-lines-open': isExpanded }" :depth="pv.depth">
+        <button @click="expandLine()" type="button" class="evaluation-lines-more" :class="{ 'evaluation-lines-inverted': isExpanded }">
+            <span class="evaluation-lines-icon icon-font-chess caret-down"></span>
+        </button>
+        <a class="evaluation-lines-score" :class="{ 'evaluation-lines-negative': pv.absoluteScore < 0 }">
+            {{ pvEvaluationToString(pv, false) }}
+        </a>
+        <span v-for="(san, index) in pv.lineSan" class="evaluation-lines-node">
+            {{ getSanNode(san, index) }}
+        </span>
+    </div>
+</template>

@@ -16,6 +16,9 @@ export interface IOptions {
     engineHash: number;
     engineUseExternal: boolean;
     engineExternalPort: number;
+    engineDisableMinOptions: boolean;
+
+    enableAutoMove: boolean;
 }
 
 const hasChromeStorageAccess = chrome && chrome.storage && chrome.storage.sync;
@@ -36,6 +39,9 @@ export const options = reactive<IOptions>({
     engineHash: 1024,
     engineUseExternal: false,
     engineExternalPort: 8000,
+    engineDisableMinOptions: false,
+
+    enableAutoMove: false,
 });
 
 function setOptions(opts: IOptions) {
@@ -46,7 +52,7 @@ function setOptions(opts: IOptions) {
 export function requestOptions(callback?: { (): void }) {
 
     if (hasChromeStorageAccess) {
-        chrome.storage.sync.get<IOptions>(options, function (opts) {
+        chrome.storage.sync.get<IOptions>(options, function (opts: IOptions) {
             setOptions(opts);
             if (callback) callback();
         });
@@ -66,7 +72,10 @@ export function requestOptions(callback?: { (): void }) {
 
 // callback should return true to stop listening for updates
 export function onOptionsUpdated(callback: FuncOptsCallback) {
-    onUpdateCallbacks.push(callback);
+    // deduplicate: don't register the same callback twice
+    if (!onUpdateCallbacks.includes(callback)) {
+        onUpdateCallbacks.push(callback);
+    }
 }
 
 // Must be called in the content script to handle options
@@ -127,8 +136,8 @@ watch(options, (first, second) => {
     // only update the storage from popup
     if (hasChromeTabsAccess) {
         chrome.storage.sync.set(options);
-        chrome.tabs.query({}, function (tabs) {
-            tabs.forEach(function (tab) {
+        chrome.tabs.query({}, function (tabs: chrome.tabs.Tab[]) {
+            tabs.forEach(function (tab: chrome.tabs.Tab) {
                 if (tab.id) {
                     chrome.tabs.sendMessage<IOptions>(
                         tab.id,

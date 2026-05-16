@@ -1,3 +1,11 @@
+<script setup lang="ts">
+import SettingsRow from "./settings-row.vue"
+import SettingsCheckBox from "./settings-checkbox.vue"
+import SettingsNumber from "./settings-number.vue"
+import { options } from "@/options";
+
+</script>
+
 <template>
     <SettingsRow label="Engine depth">
         <SettingsNumber v-model="options.engineDepth" :min="1" :max="30" />
@@ -14,14 +22,9 @@
     <SettingsRow v-if="options.engineUseExternal" label="External engine port">
         <SettingsNumber v-model="options.engineExternalPort" :min="1" :max="65535" :step="1"/>
     </SettingsRow>
+    <SettingsRow label="Disable minimum MultiPV">
+        <SettingsCheckBox v-model="options.engineDisableMinOptions"/>
+    </SettingsRow>
 </template>
-
-<script setup lang="ts">
-import SettingsRow from "./settings-row.vue"
-import SettingsCheckBox from "./settings-checkbox.vue"
-import SettingsNumber from "./settings-number.vue"
-import { options } from "@/options";
-
-</script>
 
 <style scoped lang="scss"></style>

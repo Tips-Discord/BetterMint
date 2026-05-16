@@ -1,24 +1,3 @@
-<template>
-    <div :class="$style.container">
-        <div :class="[$style.bar, { [$style.flipped]: isFlipped }]">
-
-            <span :class="[$style.scoreAbbreviated, evaluation.score >= 0 ? $style.darkScore : $style.lightScore]">
-                {{ evaluationToString(evaluation, true) }}
-            </span>
-
-            <span :class="[$style.score, evaluation.score >= 0 ? $style.darkScore : $style.lightScore]">
-                {{ evaluationToString(evaluation, false) }}
-            </span>
-        
-            <div :class="$style.fill">
-                <div :class="[$style.color, $style.black]"></div>
-                <div :class="[$style.color, $style.draw]"></div>
-                <div :class="[$style.color, $style.white]" :style="getTransform(evaluation)"></div>
-            </div>
-        </div>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { evaluationToString } from '@/utils/utils';
 import { computed } from 'vue'
@@ -37,13 +16,11 @@ defineProps({
 })
 
 function getTransform(evaluation: IAbsEvaluation) {
-    
-    let percent: number, textScore: string, textScoreAbb: string;
+
+    let percent: number;
 
     if (evaluation.isMate) {
         percent = evaluation.score < 0 ? 100 : 0;
-        textScoreAbb = "M" + Math.abs(evaluation.score).toString();
-        textScore = (evaluation.score < 0 ? "-" : "+") + textScoreAbb;
     } else {
         const maxScore = 500;
         const minScore = -500;
@@ -54,16 +31,33 @@ function getTransform(evaluation: IAbsEvaluation) {
 
         if (percent < 5) percent = 5;
         else if (percent > 95) percent = 95;
-
-        textScore = evaluation.score >= 0 ? "+" : "";
-        textScore += smallScore.toFixed(2);
-        textScoreAbb = Math.abs(smallScore).toFixed(1);
     }
 
     return `transform: translate3d(0px, ${percent}%, 0px)`
 }
 
 </script>
+
+<template>
+    <div :class="$style.container">
+        <div :class="[$style.bar, { [$style.flipped]: isFlipped }]">
+
+            <span :class="[$style.scoreAbbreviated, evaluation.score >= 0 ? $style.darkScore : $style.lightScore]">
+                {{ evaluationToString(evaluation, true) }}
+            </span>
+
+            <span :class="[$style.score, evaluation.score >= 0 ? $style.darkScore : $style.lightScore]">
+                {{ evaluationToString(evaluation, false) }}
+            </span>
+
+            <div :class="$style.fill">
+                <div :class="[$style.color, $style.black]"></div>
+                <div :class="[$style.color, $style.draw]"></div>
+                <div :class="[$style.color, $style.white]" :style="getTransform(evaluation)"></div>
+            </div>
+        </div>
+    </div>
+</template>
 
 <style module lang="scss">
 
@@ -120,7 +114,7 @@ function getTransform(evaluation: IAbsEvaluation) {
         color: #ffffff;
         top: 0
     }
-    
+
     .fill {
         background-color: hsla(0,0%,100%,.05);
         border-radius: .2rem;
@@ -129,7 +123,7 @@ function getTransform(evaluation: IAbsEvaluation) {
         position: relative;
         width: 100%;
         z-index: -1;
-        
+
         .color {
             bottom: 0;
             height: 100%;
@@ -153,7 +147,7 @@ function getTransform(evaluation: IAbsEvaluation) {
             }
         }
     }
-    
+
     &:hover .score {
         border-radius: .3rem;
         bottom: auto;
@@ -181,7 +175,7 @@ function getTransform(evaluation: IAbsEvaluation) {
         background-color: #403d39;
         color: #fff;
     }
-    
+
     &.flipped, &.flipped .scoreAbbreviated {
         transform: rotate(180deg);
         --scoreTransform: rotate(180deg);

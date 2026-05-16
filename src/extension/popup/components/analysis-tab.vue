@@ -1,3 +1,11 @@
+<script setup lang="ts">
+import SettingsRow from "./settings-row.vue"
+import SettingsCheckBox from "./settings-checkbox.vue"
+import SettingsNumber from "./settings-number.vue"
+import { options } from "@/options";
+
+</script>
+
 <template>
     <SettingsRow label="Display arrows">
         <SettingsCheckBox v-model="options.showArrows"/>
@@ -18,14 +26,6 @@
         <SettingsNumber v-model="options.multiPv" :min="1" :max="5"/>
     </SettingsRow>
 </template>
-
-<script setup lang="ts">
-import SettingsRow from "./settings-row.vue"
-import SettingsCheckBox from "./settings-checkbox.vue"
-import SettingsNumber from "./settings-number.vue"
-import { options } from "@/options";
-
-</script>
 
 <style scoped lang="scss">
 </style>

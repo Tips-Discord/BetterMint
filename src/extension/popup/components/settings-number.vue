@@ -1,13 +1,3 @@
-<template>
-    <div class="input-number">
-    	<span class="button minus" :class="{ 'disabled': min && modelValue <= min }" @click="updateValue(modelValue - (step ?? 1))"></span>
-    	<span class="text-edit" contenteditable="true" @focusout="onFocusOut($event)" @keydown="onKeyDown($event)">
-            {{ modelValue }}
-        </span>
-    	<span class="button plus" :class="{'disabled': max && modelValue >= max}" @click="updateValue(modelValue + (step ?? 1))"></span>
-    </div>
-</template>
-
 <script setup lang="ts">
 const props = defineProps({
     modelValue: {
@@ -25,63 +15,59 @@ const props = defineProps({
     }
 })
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{
+    'update:modelValue': [value: number]
+}>()
+
+function clamp(value: number): number {
+    if (props.min !== undefined && value < props.min) return props.min
+    if (props.max !== undefined && value > props.max) return props.max
+    return value
+}
 
 function updateValue(value: number) {
-    if (props.min && value < props.min) {
-        value = props.min;
+    const clamped = clamp(value)
+    if (clamped !== props.modelValue) {
+        emit('update:modelValue', clamped)
     }
-    if (props.max && value > props.max) {
-        value = props.max;
-    }
-    if (value === props.modelValue)
-    {
-        return;
-    }
-    emit('update:modelValue', value)
 }
 
 function onFocusOut(event: Event) {
-    const target = event.target as HTMLSpanElement;
-    window.getSelection()?.removeAllRanges();
+    const target = event.target as HTMLSpanElement
+    window.getSelection()?.removeAllRanges()
 
-    const textContent = target.textContent ?? "";
-    
-    let value = +textContent;
-    if (textContent === "") {
-        target.textContent = String(props.modelValue);
-        value = props.modelValue;
+    const textContent = target.textContent ?? ""
+    let value = +textContent
+    if (textContent === "" || Number.isNaN(value)) {
+        value = props.modelValue
     }
 
-    
-    if (props.min && value < props.min)
-    {
-        value = props.min;
-    }
-    else if (props.max && value > props.max)
-    {
-        value = props.max;
-    }
-
-    target.textContent = String(value);
-    updateValue(value);
+    value = clamp(value)
+    target.textContent = String(value)
+    emit('update:modelValue', value)
 }
 
 function onKeyDown(event: KeyboardEvent) {
-    const target = event.target as HTMLSpanElement;
-    console.log(event.key);
-    if (event.key === "Enter")
-    {
-        target.blur();
-    } else if (event.key.length == 1 && !event.shiftKey && !event.ctrlKey && !event.altKey)
-    {
-        if  (event.key < '0' || event.key > '9'){
-            event.preventDefault();
+    if (event.key === "Enter") {
+        (event.target as HTMLSpanElement).blur()
+    } else if (event.key.length === 1 && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+        if (event.key < '0' || event.key > '9') {
+            event.preventDefault()
         }
     }
 }
-
 </script>
+
+<template>
+    <div class="input-number">
+    	<span class="button minus" :class="{ 'disabled': min !== undefined && modelValue <= min }" @click="updateValue(modelValue - (step ?? 1))"></span>
+    	<span class="text-edit" contenteditable="true" @focusout="onFocusOut($event)" @keydown="onKeyDown($event)">
+            {{ modelValue }}
+        </span>
+    	<span class="button plus" :class="{'disabled': max !== undefined && modelValue >= max}" @click="updateValue(modelValue + (step ?? 1))"></span>
+    </div>
+</template>
+
 <style scoped lang="scss">
 @import  "../global.scss";
 

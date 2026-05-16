@@ -1,25 +1,3 @@
-<template>
-    <div class="tabs-container">
-        <div role="tablist" class="tabs-component">
-            <div
-                v-for="tab in tabs"
-                @click="selectedTabId = tab.id"
-                class="tabs-tab"
-                :class="{ 'tabs-active': selectedTabId == tab.id }"
-                role="tab"
-                tabindex="0"
-            >
-                <div class="tabs-icon" v-html="tab.icon" :style="selectedTabId == tab.id ? 'fill: #ffffff' : 'fill: #afafaf'"></div>
-
-                <span class="tabs-label">{{ tab.title }}</span>
-            </div>
-        </div>
-        <div v-for="tab in tabs" v-show="selectedTabId == tab.id" class="tab-content-component" role="tabpanel">
-            <component :is="tab!.component"></component>
-        </div>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { PropType, computed, ref } from "vue";
 import { ITabData } from "./tabs";
@@ -46,6 +24,28 @@ const selectedTab = computed(() => {
 });
 </script>
 
+<template>
+    <div class="tabs-container">
+        <div role="tablist" class="tabs-component">
+            <div
+                v-for="tab in tabs"
+                @click="selectedTabId = tab.id"
+                class="tabs-tab"
+                :class="{ 'tabs-active': selectedTabId == tab.id }"
+                role="tab"
+                tabindex="0"
+            >
+                <div class="tabs-icon" v-html="tab.icon" :style="selectedTabId == tab.id ? 'fill: #ffffff' : 'fill: #afafaf'"></div>
+
+                <span class="tabs-label">{{ tab.title }}</span>
+            </div>
+        </div>
+        <div class="tab-content-component" role="tabpanel">
+            <component :is="selectedTab?.component" :key="selectedTabId" />
+        </div>
+    </div>
+</template>
+
 <style scoped lang="scss">
 @import "../global.scss";
 
@@ -67,6 +67,7 @@ const selectedTab = computed(() => {
         padding: 0.5rem 1rem;
         overflow-y: auto;
     }
+
 }
 
 .tabs-component {
@@ -81,15 +82,22 @@ const selectedTab = computed(() => {
         min-width: 0;
         padding: 0.8rem 0 0.8rem 0;
         position: relative;
-                    
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
         &.tabs-active {
             cursor: default;
             color: $font-color;
+            background-color: $button-background;
+            border-bottom: 2px solid $accent-color;
         }
 
         &:not(.tabs-active) {
-            background-color: $header-background;
             color: $font-color-inactive;
+            border-bottom: 2px solid transparent;
+
+            &:hover {
+                color: $font-color;
+            }
         }
 
         .tabs-icon {

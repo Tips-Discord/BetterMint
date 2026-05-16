@@ -153,9 +153,11 @@ export class ChessComBoard implements IChessboard {
                 let pluginCreate = plugin.create;
                 plugin.create = function (e: any) {
                     pluginCreate.apply(this, [e]);
-                    plugin.match.forEach((match) => {
-                        match.condition({ type: "a" });
-                    });
+                    if (plugin.match) {
+                        plugin.match.forEach((match: any) => {
+                            match.condition({ type: "a" });
+                        });
+                    }
 
                     let element =
                         document.querySelector("wc-simple-move-list") ||
@@ -163,11 +165,13 @@ export class ChessComBoard implements IChessboard {
 
                     let scrollerContainerId = element?.getAttribute(
                         "scroll-container-id"
-                    )!;
+                    );
+                    if (!scrollerContainerId) return;
 
                     let scrollerContainer = document.querySelector(
                         "#" + scrollerContainerId
-                    )!.parentElement!;
+                    )?.parentElement;
+                    if (!scrollerContainer) return;
 
                     _this.analysis.mountSidebar(scrollerContainer);
                 };

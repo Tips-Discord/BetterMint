@@ -1,10 +1,3 @@
-<template>
-    <label class="toggle">
-        <input type="checkbox" :checked="modelValue" @change="updateValue($event)">
-        <div class="slide-toggle"></div>
-    </label>
-</template>
-
 <script setup lang="ts">
 defineProps({
     modelValue: {
@@ -13,13 +6,22 @@ defineProps({
     }
 })
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{
+    'update:modelValue': [value: boolean]
+}>()
 
-function updateValue(event: Event) {
+function onInput(event: Event) {
     emit('update:modelValue', (event.target as HTMLInputElement).checked)
 }
-
 </script>
+
+<template>
+    <label class="toggle">
+        <input type="checkbox" :checked="modelValue" @change="onInput($event)">
+        <div class="slide-toggle"></div>
+    </label>
+</template>
+
 <style scoped lang="scss">
 @import "../global.scss";
 
@@ -55,8 +57,7 @@ $thumb-size: $slider-height - $thumb-padding;
         height: $thumb-size;
         background-color: $font-color;
         transform: translate3d($thumb-padding * 0.5, 0, 0);
-        transition: 0.1s cubic-bezier(0, 1.1, 1, 1.1);
-        ;
+        transition: 0.2s ease;
     }
 
     &::before {
@@ -73,7 +74,7 @@ $thumb-size: $slider-height - $thumb-padding;
     }
 
     input:checked+& {
-        background-color: #3bc244;
+        background-color: $accent-color;
 
         &::before {
             transform: scale(0);

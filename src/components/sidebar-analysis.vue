@@ -1,16 +1,3 @@
-<template>
-    <div class="play-controller-above-move-list">
-        <div v-if="options.showEvalLines" class="evaluation-lines-lines">
-            <EvaluationLine v-for="pv in data.currentLine?.pvs.slice(0, MIN_ENGINE_MULTI_PV)" :pv="pv" :move-number="data.moveNumber"/>
-        </div>
-
-        <Feedback v-if="options.showFeedback"/>
-        <Teleport v-if="options.showEvalBar && evalBarContainer" :to="evalBarContainer">
-            <EvaluationBar :is-flipped="isFlipped"/>
-        </Teleport>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { provide, reactive, ref } from 'vue';
 import { Line } from '@/position';
@@ -20,8 +7,6 @@ import Feedback from './feedback.vue';
 import EvaluationBar from './evaluation-bar.vue';
 import { options } from '@/options';
 import { MIN_ENGINE_MULTI_PV } from '@/engine';
-
-// const feedback = ref< InstanceType<typeof Feedback>>();
 
 const evalBarContainer = ref<Element>();
 const isFlipped = ref(false);
@@ -56,3 +41,16 @@ defineExpose({
 })
 
 </script>
+
+<template>
+    <div class="play-controller-above-move-list">
+        <div v-if="options.showEvalLines" class="evaluation-lines-lines">
+            <EvaluationLine v-for="pv in data.currentLine?.pvs.slice(0, MIN_ENGINE_MULTI_PV)" :pv="pv" :move-number="data.moveNumber"/>
+        </div>
+
+        <Feedback v-if="options.showFeedback"/>
+        <Teleport v-if="options.showEvalBar && evalBarContainer" :to="evalBarContainer">
+            <EvaluationBar :is-flipped="isFlipped"/>
+        </Teleport>
+    </div>
+</template>
