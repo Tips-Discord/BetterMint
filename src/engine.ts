@@ -1,10 +1,8 @@
 import { onOptionsUpdated, options } from "./options";
 import { WsBridge } from "./extension/ws-bridge";
 import { WorkerBridge } from "./extension/worker-bridge";
-import stockfishMultiSrc from "./assets/stockfish/stockfish-18-lite.js?raw";
-import stockfishSingleSrc from "./assets/stockfish/stockfish-18-lite-single.js?raw";
-import wasmMultiUrl from "./assets/stockfish/stockfish-18-lite.wasm?inline";
-import wasmSingleUrl from "./assets/stockfish/stockfish-18-lite-single.wasm?inline";
+import stockfishSrc from "./assets/stockfish/stockfish-18-lite-single.js?raw";
+import wasmUrl from "./assets/stockfish/stockfish-18-lite-single.wasm?inline";
 
 export interface IEnginePv {
     lan: TLANotation;
@@ -50,16 +48,8 @@ export class Engine {
     private externalUrl: string = "";
 
     private resolveStockfishUrl(): string {
-        const supportsThreads = (() => {
-            try { new SharedArrayBuffer(1024); return true; }
-            catch { return false; }
-        })();
-
-        const src = supportsThreads ? stockfishMultiSrc : stockfishSingleSrc;
-        const wasmDataUrl = (supportsThreads ? wasmMultiUrl : wasmSingleUrl)
-            .replace('application/wasm', 'application/octet-stream');
-
-        const patched = src.replace(
+        const wasmDataUrl = wasmUrl.replace('application/wasm', 'application/octet-stream');
+        const patched = stockfishSrc.replace(
             /['"]stockfish\.wasm['"]/,
             `'${wasmDataUrl}'`
         );
