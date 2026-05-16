@@ -93,12 +93,9 @@ class ChessMint {
 }
 
 function Initialize(chessBoard: HTMLElement) {
-    
-    // register the options update handler then wait for options
-    // to arrive first then initialize the script
-    optionsRegisterInjectedScript(() => {
-        new ChessMint(chessBoard);
-    });
+    // register the options listener and request saved options
+    optionsRegisterInjectedScript();
+    new ChessMint(chessBoard);
 }
 
 const observer = new MutationObserver(async function (mutations) {

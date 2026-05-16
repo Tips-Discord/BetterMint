@@ -116,7 +116,7 @@ export class Engine {
                 duration: 5000,
                 icon: "circle-exclamation",
                 content: `Failed to connect to external engine on port ${options.engineExternalPort}`,
-            });
+            })?.catch(() => {});
         }
         this.worker.onclose = () => {
             if (this.isLoaded) {
@@ -125,7 +125,7 @@ export class Engine {
                     duration: 5000,
                     icon: "circle-exclamation",
                     content: "External engine disconnected",
-                });
+                })?.catch(() => {});
                 this.isLoaded = false;
                 this.isReady = false;
             }
@@ -218,12 +218,12 @@ export class Engine {
 
         if (line == "uciok") {
             this.isLoaded = true;
-            (window as any).toaster.add({
+            (window as any).toaster?.add?.({
                 id: "chess.com",
                 duration: 3000,
                 icon: "circle-info",
                 content: `ChessMint is enabled!`,
-            });
+            })?.catch(() => {});
         } else if (line === "readyok") {
             this.isReady = true;
             if (this.readyCallback) {
