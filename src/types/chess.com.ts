@@ -1,20 +1,64 @@
 export type TEventType =
+    // meta
     | "all"
-    | "Create"
+    // APIEvents (game lifecycle)
+    | "AddMove"
+    | "BlinkHighlight"
+    | "ClearMarkings"
+    | "CreateContinuation"
     | "CreateGame"
     | "DeletePosition"
+    | "DrawAgreed"
+    | "DrawClaimed"
+    | "GameResigned"
+    | "IllegalMove"
+    | "LineCommentUpdated"
     | "LineUpdated"
     | "Load"
-    | "ModeChanged"
+    | "Mark"
     | "Move"
     | "MoveBackward"
     | "MoveForward"
+    | "MoveNotAllowed"
+    | "MoveRejected"
+    | "MoveVariation"
+    | "NodeUpdated"
+    | "NodeLimitsUpdated"
+    | "OutOfTime"
+    | "PromoteVariation"
+    | "Reload"
+    | "ResetGame"
+    | "ResetToMainLine"
     | "SelectLineEnd"
     | "SelectLineStart"
     | "SelectNode"
-    | "TimeControlUpdated"
+    | "SetBoardPosition"
+    | "SetPlayingAs"
+    | "TurnSet"
     | "Undo"
+    | "Unmark"
+    | "UpdatePGNHeaders"
+    // InstanceEvents (board instance lifecycle)
+    | "Create"
+    | "Destroy"
+    | "ModeChanged"
+    | "RendererSet"
+    | "RendererSetFailed"
+    | "WebGLAssetsInitialized"
+    | "StylesSetFailed"
+    // OptionsEvents
     | "UpdateOptions"
+    | "UpdateModeOptions"
+    // SoundEvents
+    | "PlaySound"
+    // BoardEvents
+    | "PromotionAreaClosePointerdown"
+    | "PromotionPiecePointerdown"
+    // UIEvents
+    | "Resize"
+    | "ToggleHotkeyLegend"
+    // Legacy
+    | "TimeControlUpdated"
     | "PluginAdded"
     | "PluginRemoved";
 
@@ -60,26 +104,86 @@ export type TEffectType =
     | "WinnerWhite"
     | "Interesting"
     | "Warning"
-    | "Equal";
+    | "Equal"
+    | "Stalemate"
+    | "Abandon"
+    | "BughouseWhite"
+    | "BughouseBlack";
 
 export type TMarkingType = "arrow" | "effect" | "highlight";
 
 export interface IMarking {
     type: TMarkingType;
     key?: string; // "arrow|e2e4", "effect|e4"
-    node?: boolean | { line: number; move: number }; // set to true will make it hidden when moving forward/backward in the game
+    /**
+     * Node binding. `true` binds to the current node; `{line, move}` binds to
+     * a specific node and is internally keyed as `${key}-(${move})|(${line})`.
+     * Set to `true` to make the marking hidden when navigating forward/backward.
+     */
+    node?: boolean | { line: number; move: number };
     persistent?: boolean; // set to false when you want it to be removed when user interact with the board
+    /**
+     * Internal id assigned when a marking is bound to a specific node
+     * (format: `${key}-(${move})|(${line})`). Read-only from consumer code.
+     */
+    id?: string;
     data: {
+        // arrow fields
         from?: string;
         to?: string;
+        // highlight / effect fields
         square?: string;
         color?: string;
+        keyPressed?: "alt" | "ctrl" | "shift" | "none" | string;
+        // alternative to color: render a pointing finger cursor
+        pointerFinger?: boolean;
         opacity?: number; // between 0 and 1
         type?: TEffectType;
         animated?: boolean;
         path?: string; // svg path for effect
+        // custom-color override
+        customColor?: string;
+        // animated removal
+        removalClass?: string;
+        removalTimeout?: number; // ms, default 400
+        // custom image / sprite frame
+        frame?: {
+            imageURL: string;
+            imageAnimated?: boolean;
+            positionRatioX?: number;
+            positionRatioY?: number;
+            widthRatio?: number;
+            heightRatio?: number;
+        };
+        // arbitrary extension fields (e.g. guess-the-move payload)
+        [key: string]: any;
     };
     tags?: string[];
+}
+
+export interface IGameNode {
+    // Position of this node in the move tree.
+    ids: { move: number; line: number };
+    // Parent node reference (undefined for the root).
+    previous?: { line: number; move: number };
+    // 0-indexed ply (0 = start position).
+    moveNumber: number;
+    // Display move number (1, 2, 3, ...). 
+    wholeMoveNumber: number;
+    // Same as moveNumber in most contexts. 
+    ply?: number;
+    // 1 = white, 2 = black. 
+    color: number;
+    san: string;
+    fen: string;
+    beforeFen?: string;
+    time?: number;
+    annotation?: string;
+    additionalAnnotation?: string;
+    comment?: string;
+    isBeforeComment?: boolean;
+    customColor?: string;
+    [key: string]: any;
 }
 
 export interface IGameHistory {
@@ -253,6 +357,9 @@ export interface IGame {
     // emit game events
     emit(event: string, data: any): any;
 
+    // unsubscribe from a game event (mirror of `on`)
+    off?: (event: TEventType, fn: (event: IGameEvent) => void) => void;
+
     // be aware that this will return false if the game hasn't started
     isGameOver(): boolean;
 
@@ -295,6 +402,53 @@ export interface IGame {
     getLegalMoves(): IMoveDetail[];
 
     getNodeIds(): { move: number; line: number };
+
+    // Currently selected node (richer than `getNodeIds()`).
+    getSelectedNode?(): IGameNode | undefined;
+
+    // Look up a specific node by `{line, move}`. 
+    getNodeByIds?(ids: { line: number; move: number }): IGameNode | undefined;
+
+    // Starting move number used for SAN rendering (usually 1).
+    getStartingMoveNumber?(): number;
+
+    // Get the position object at a given node (defaults to current).
+    getPosition?(move?: number, line?: number): any;
+
+    // Programmatic node navigation.
+    selectNode?(line: number, move: number): void;
+    selectLineStart?(line?: number): void;
+    selectLineEnd?(line?: number): void;
+
+    // Get or set the current turn (omit arg to get).
+    turn?(color?: number): number;
+
+    /** Game result (e.g. "1-0", "0-1", "1/2-1/2", "*"). */
+    getResult?(): any;
+
+    /** Position fingerprints cache (e.g. `{ startingFen: string }`). */
+    getFingerprints?(): { startingFen: string; [key: string]: any };
+
+    // Manual animation control (used internally by the animation queue).
+    setAnimatingStatus?(status: boolean): void;
+
+    // PGN header accessor (omit name to get all headers). 
+    header?(name?: string): any;
+
+    // Update a comment on a specific line.
+    updateLineComment?(lineId: any, comment: any): void;
+
+    // Move a variation up (direction=-1) or down (direction=1) in the tree. 
+    moveVariation?(line: number, direction: number): boolean;
+
+    // Reset the move tree back to the main line.
+    resetToMainLine?(): void;
+
+    // Clock info accessor (present on timed games).
+    timeControl?: { get(): { baseTime: number; [key: string]: any } | null };
+
+    // Observer-mode helpers (present when game is being observed).
+    observing?: { isAnalyzing(): boolean };
 
     isAnimating(): boolean;
 

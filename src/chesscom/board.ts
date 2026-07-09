@@ -6,6 +6,7 @@ import {
     IChessboardEffect,
     IChessboardHandler,
 } from "../types/chessboard";
+import { STARTING_FEN } from "../constants";
 import { AnalysisUI } from "../analysis-ui";
 import { TEffectType, IMarking, IBoardElement, IGamePlugin, IGameEvent, IMoveDetail, IGameHistory, IGame } from "@/types/chess.com";
 import { Icons } from "@/assets/icons";
@@ -304,7 +305,7 @@ export class ChessComBoard implements IChessboard {
             getLAN(line.from, line.to, line.promotion)
         );
         this.handler.onNewGame(
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            STARTING_FEN,
             lanMoves
         );
     }
@@ -317,7 +318,7 @@ export class ChessComBoard implements IChessboard {
         );
 
         this.handler.onNewGame(
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            STARTING_FEN,
             lanMoves
         );
     }

@@ -1,7 +1,8 @@
-import { Chess } from "chess.js";
+import { Chess, validateFen } from "chess.js";
 import { IEnginePv, MIN_ENGINE_MULTI_PV } from "./engine";
 import { Analyser } from "./analyser";
 import { EClassification, IChessboard } from "./types/chessboard";
+import { STARTING_FEN } from "./constants";
 import eco from "./assets/ecotable.json";
 import { onOptionsUpdated, options } from "./options";
 
@@ -36,11 +37,16 @@ export interface IPrincipalVariation extends IEnginePv {
 const pvCache = new Map<string, { san: string; lineSan: string[] }>();
 const PV_CACHE_MAX = 128;
 
+export function clearPvCache(): void {
+    pvCache.clear();
+    resetConvertEnginePvState();
+}
+
 let convertEnginePv = (() => {
     let chess: Chess | null = null;
     let lastFen = '';
 
-    return (fen: string, pv: IEnginePv): IPrincipalVariation => {
+    const convert = (fen: string, pv: IEnginePv): IPrincipalVariation => {
         const key = fen + '|' + (pv.line[0] ?? '');
         const cached = pvCache.get(key);
         if (cached) {
@@ -48,31 +54,60 @@ let convertEnginePv = (() => {
         }
 
         if (!chess || lastFen !== fen) {
-            chess = new Chess();
-            chess.load(fen);
+            const next = new Chess();
+            const fenCheck = validateFen(fen);
+            if (!fenCheck.ok) {
+                throw new Error(
+                    `convertEnginePv: invalid FEN "${fen}" (${fenCheck.error ?? "unknown error"})`
+                );
+            }
+            next.load(fen);
+            chess = next;
             lastFen = fen;
         }
 
         const moveCount = pv.line.length;
-        const lineSan = pv.line.map(san => chess!.move(san).san);
+        const lineSan: string[] = [];
+        for (const lan of pv.line) {
+            const m = chess.move(lan);
+            if (!m) {
+                // The engine returned an illegal/malformed move in the PV.
+                // Stop converting and bail out instead of producing a partial
+                // or wrong SAN list.
+                throw new Error(`convertEnginePv: illegal move "${lan}" for FEN "${fen}"`);
+            }
+            lineSan.push(m.san);
+        }
 
         for (let i = 0; i < moveCount; i++) {
-            chess!.undo();
+            chess.undo();
         }
 
         // Evict oldest if cache too large
         if (pvCache.size >= PV_CACHE_MAX) {
-            pvCache.delete(pvCache.keys().next().value!);
+            const oldest = pvCache.keys().next().value;
+            if (oldest !== undefined) pvCache.delete(oldest);
         }
         pvCache.set(key, { san: lineSan[0], lineSan });
 
         return {
             ...pv,
             san: lineSan[0],
-            lineSan: lineSan,
+            lineSan: lineSan as TSANotation[],
         };
     };
+
+    (convert as any).__reset = () => {
+        chess = null;
+        lastFen = '';
+    };
+
+    return convert;
 })();
+
+function resetConvertEnginePvState(): void {
+    (convertEnginePv as any).__reset?.();
+}
 
 export class Line {
     public readonly pvs: IPrincipalVariation[];
@@ -337,7 +372,7 @@ export class Position {
         this.board = board;
         this.analyser = new Analyser(this.board);
         this.startLine = new Line(
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            STARTING_FEN,
             "a1a1",
             "",
             this.chess.moves()
@@ -352,13 +387,16 @@ export class Position {
     public newGame() {
         this.currentNode = -1;
         this.lines = [];
-        this.startFen =
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        this.startFen = STARTING_FEN;
         this.chess.reset();
+        clearPvCache();
     }
 
     public move(lan: TLANotation) {
         const m = this.chess.move(lan);
+        if (!m) {
+            throw new Error(`Position.move: illegal LAN "${lan}"`);
+        }
         const line = new Line(m.after, lan, m.san, this.chess.moves());
         this.lines.push(line);
         this.currentNode = this.lines.length - 1;

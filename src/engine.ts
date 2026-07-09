@@ -33,7 +33,7 @@ const REGEX_PV =
 
 export class Engine {
     private readonly handler: IEngineHandler;
-    private worker!: Worker | WebSocket | WsBridge | WorkerBridge;
+    private worker?: Worker | WebSocket | WsBridge | WorkerBridge;
     private currentMoveNumber: number = 0;
     private isLoaded: boolean;
     private isReady: boolean;
@@ -46,6 +46,8 @@ export class Engine {
     private reconnectAttempts: number = 0;
     private reconnectTimer?: ReturnType<typeof setTimeout>;
     private externalUrl: string = "";
+    private stockfishBlobUrl?: string;
+    private isDestroyed: boolean = false;
 
     private resolveStockfishUrl(): string {
         const wasmDataUrl = wasmUrl.replace('application/wasm', 'application/octet-stream');
@@ -54,7 +56,15 @@ export class Engine {
             `'${wasmDataUrl}'`
         );
 
-        return URL.createObjectURL(new Blob([patched], { type: 'application/javascript' }));
+        // Revoke any previously created blob URL to avoid leaking Object URLs
+        if (this.stockfishBlobUrl) {
+            URL.revokeObjectURL(this.stockfishBlobUrl);
+            this.stockfishBlobUrl = undefined;
+        }
+
+        const url = URL.createObjectURL(new Blob([patched], { type: 'application/javascript' }));
+        this.stockfishBlobUrl = url;
+        return url;
     }
 
     constructor(handler: IEngineHandler) {
@@ -83,16 +93,30 @@ export class Engine {
     }
 
     private initBuiltinWorker() {
+        if (this.isDestroyed) return;
+
         const url = this.resolveStockfishUrl();
         if (!url) return; // content script hasn't prepared the blob URL yet
 
         try {
-            this.worker = new WorkerBridge(url);
-            this.worker.onmessage = (e) => {
+            const worker = new WorkerBridge(url);
+            worker.onmessage = (e: MessageEvent<string>) => {
                 this.processMessage(e);
             };
+            this.worker = worker;
         } catch (e) {
-            alert("Failed to load stockfish");
+            console.error("Failed to load stockfish:", e);
+            (window as any).toaster?.add?.({
+                id: "chess.com",
+                duration: 5000,
+                icon: "circle-exclamation",
+                content: "Failed to load stockfish engine",
+            })?.catch(() => {});
+            // Revoke the blob URL we just created since the worker failed to start.
+            if (this.stockfishBlobUrl) {
+                URL.revokeObjectURL(this.stockfishBlobUrl);
+                this.stockfishBlobUrl = undefined;
+            }
             throw e;
         }
 
@@ -101,16 +125,19 @@ export class Engine {
     }
 
     private connectExternal() {
-        this.worker = new WsBridge(this.externalUrl);
-        this.worker.onmessage = (e) => {
+        if (this.isDestroyed) return;
+
+        const bridge = new WsBridge(this.externalUrl);
+        this.worker = bridge;
+        bridge.onmessage = (e: MessageEvent<string>) => {
             this.processMessage(e);
         }
-        this.worker.onopen = () => {
+        bridge.onopen = () => {
             this.reconnectAttempts = 0;
             this.send("uci");
             this.updateOptions();
         }
-        this.worker.onerror = () => {
+        bridge.onerror = () => {
             (window as any).toaster?.add?.({
                 id: "chess.com",
                 duration: 5000,
@@ -118,7 +145,7 @@ export class Engine {
                 content: `Failed to connect to external engine on port ${options.engineExternalPort}`,
             })?.catch(() => {});
         }
-        this.worker.onclose = () => {
+        bridge.onclose = () => {
             if (this.isLoaded) {
                 (window as any).toaster?.add?.({
                     id: "chess.com",
@@ -129,6 +156,8 @@ export class Engine {
                 this.isLoaded = false;
                 this.isReady = false;
             }
+
+            if (this.isDestroyed) return;
 
             const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
             this.reconnectAttempts++;
@@ -141,9 +170,45 @@ export class Engine {
         this.send("ucinewgame");
     }
 
+    public destroy() {
+        this.isDestroyed = true;
+
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = undefined;
+        }
+
+        this.readyCallback = undefined;
+        this.bestmoveCallback = undefined;
+        this.isEvaluating = false;
+        this.isReady = false;
+        this.isLoaded = false;
+
+        const worker = this.worker;
+        this.worker = undefined;
+        if (!worker) return;
+
+        if (worker instanceof WorkerBridge) {
+            worker.terminate();
+        } else if (worker instanceof Worker) {
+            worker.terminate();
+        } else if (worker instanceof WebSocket) {
+            try { worker.close(); } catch { /* ignore */ }
+        }
+        // WsBridge cleans up its own listeners when its underlying socket closes;
+        // it has no public disconnect method.
+
+        if (this.stockfishBlobUrl) {
+            URL.revokeObjectURL(this.stockfishBlobUrl);
+            this.stockfishBlobUrl = undefined;
+        }
+    }
+
     public go(lanMoves: TLANotation[], depth: number = options.engineDepth) {
+        if (this.isDestroyed) return;
         if (!this.worker) {
             this.initBuiltinWorker();
+            if (!this.worker) return;
         }
 
         let fn = () => {
@@ -187,13 +252,20 @@ export class Engine {
     }
 
     private send(cmd: string): void {
-        if (!this.worker) return;
-        if (this.worker instanceof WorkerBridge) {
-            this.worker.postMessage(cmd);
-        } else if (this.worker instanceof Worker) {
-            this.worker.postMessage(cmd);
-        } else if (this.worker.readyState === WebSocket.OPEN) {
-            this.worker.send(cmd);
+        const worker = this.worker;
+        if (!worker) return;
+        if (worker instanceof WorkerBridge) {
+            worker.postMessage(cmd);
+        } else if (worker instanceof Worker) {
+            worker.postMessage(cmd);
+        } else if (worker instanceof WsBridge) {
+            if (worker.readyState === WebSocket.OPEN) {
+                worker.send(cmd);
+            }
+        } else if (worker instanceof WebSocket) {
+            if (worker.readyState === WebSocket.OPEN) {
+                worker.send(cmd);
+            }
         }
     }
 
@@ -210,9 +282,14 @@ export class Engine {
         });
     }
 
-    private processMessage(event: MessageEvent<any>) {
+    private processMessage(event: MessageEvent<string> | string) {
         let line: string =
             event && typeof event === "object" ? event.data : event;
+
+        if (typeof line !== "string") {
+            // Ignore non-string payloads
+            return;
+        }
 
         // console.log("SF: " + line);
 
@@ -246,30 +323,48 @@ export class Engine {
 
             if (match && match.groups) {
                 if (!this.isRequestedStop) {
-                    const line = match.groups["pv"].split(" ") as TLANotation[];
-                    const score = parseInt(match.groups["score"]);
+                    const pvLine = match.groups["pv"].split(" ") as TLANotation[];
+                    const score = parseInt(match.groups["score"], 10);
+                    const depth = parseInt(match.groups["depth"], 10);
+                    const seldepth = parseInt(match.groups["seldepth"], 10);
+                    const multipv = parseInt(match.groups["multipv"], 10);
+                    const nodes = parseInt(match.groups["nodes"], 10);
+                    const nps = parseInt(match.groups["nps"], 10);
+
+                    if (
+                        Number.isNaN(score) ||
+                        Number.isNaN(depth) ||
+                        Number.isNaN(seldepth) ||
+                        Number.isNaN(multipv) ||
+                        Number.isNaN(nodes) ||
+                        Number.isNaN(nps) ||
+                        pvLine.length === 0
+                    ) {
+                        return;
+                    }
+
                     const absoluteScore =
                         this.currentMoveNumber % 2 == 0 ? -score : score;
 
                     const promotion =
-                        line[0].length == 5
-                            ? (line[0].substring(4, 5) as TPromotionPiece)
+                        pvLine[0].length == 5
+                            ? (pvLine[0].substring(4, 5) as TPromotionPiece)
                             : undefined;
 
                     let pv: IEnginePv = {
-                        lan: line[0],
-                        line: line,
-                        from: line[0].substring(0, 2) as TSquare,
-                        to: line[0].substring(2, 4) as TSquare,
+                        lan: pvLine[0],
+                        line: pvLine,
+                        from: pvLine[0].substring(0, 2) as TSquare,
+                        to: pvLine[0].substring(2, 4) as TSquare,
                         promotion: promotion,
-                        depth: parseInt(match.groups["depth"]),
-                        seldepth: parseInt(match.groups["seldepth"]),
-                        multipv: parseInt(match.groups["multipv"]),
+                        depth: depth,
+                        seldepth: seldepth,
+                        multipv: multipv,
                         score: score,
                         absoluteScore: absoluteScore,
                         isMate: match.groups["scoreType"] == "mate",
-                        nodes: parseInt(match.groups["nodes"]),
-                        nps: parseInt(match.groups["nps"]),
+                        nodes: nodes,
+                        nps: nps,
                     };
                     this.handler.onUpdatePv(this.currentMoveNumber, pv);
                 }

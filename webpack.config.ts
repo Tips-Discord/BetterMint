@@ -39,7 +39,7 @@ class ChromeExtensionReloader implements WebpackPluginInstance {
 }
 
 function modifyManifest(input: Buffer) {
-    var manifest = JSON.parse(input.toString());
+    const manifest = JSON.parse(input.toString());
 
     manifest.background = {
         service_worker: "service-worker.js",

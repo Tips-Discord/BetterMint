@@ -202,32 +202,20 @@ function classifyPosition(
 }
 
 function moveGrade(difference: number, currentScore: number) {
-    var n,
-        i,
-        r,
-        o,
-        l,
-        c,
-        u,
-        d,
-        h,
-        higherRange,
-        sdiff,
-        lowerRange,
-        previousSdiff,
-        defaultGrade = 100,
-        gradeMap: any = {
-            blunder: [0, 40],
-            mistake: [40, 60],
-            inaccuracy: [60, 80],
-            good: [80, 95],
-            excellent: [95, 98],
-            best: [98, 100],
-        },
-        w = {
-            numerator: 4.9,
-            denominator: 0.1215,
-        };
+    let n, i, r, o, l, c, u, d, h, higherRange, sdiff, lowerRange, previousSdiff;
+    const defaultGrade = 100;
+    const gradeMap: any = {
+        blunder: [0, 40],
+        mistake: [40, 60],
+        inaccuracy: [60, 80],
+        good: [80, 95],
+        excellent: [95, 98],
+        best: [98, 100],
+    };
+    const w = {
+        numerator: 4.9,
+        denominator: 0.1215,
+    };
     if (difference <= 0)
         return {
             letter: "best",
