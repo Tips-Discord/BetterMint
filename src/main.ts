@@ -33,8 +33,13 @@ class ChessMint {
     }
 
     public onMove(lan: TLANotation) {
+        const isAutoMoving = (window as any).__chessmintAutoMoving;
+        (window as any).__chessmintAutoMoving = false;
+
         const line = this.position.move(lan);
         if (!line.isGameOver()) {
+            // Only skip auto-move from self-evaluation; bot's move resets it
+            (window as any).__chessmintSkipAutoMove = isAutoMoving;
             this.engine.go(this.position.getLanMoves());
         }
     }
@@ -80,22 +85,28 @@ class ChessMint {
                 this.evaluatePreviousLineIfNeeded(moveNumber);
             }
 
-            if (options.enableAutoMove) {
-                setTimeout(() => {
-                    const from = lan.substring(0, 2);
-                    const to = lan.substring(2, 4);
-                    const promotion = lan.length > 4 ? lan.substring(4, 5) : undefined;
-                    new AutomaticMove([from, to, promotion as string]).execute().catch(() => {});
+            if (options.enableAutoMove && !(window as any).__chessmintSkipAutoMove) {
+                const from = lan.substring(0, 2);
+                const to = lan.substring(2, 4);
+                const promotion = lan.length > 4 ? lan.substring(4, 5) : undefined;
+                setTimeout(async () => {
+                    try {
+                        await new AutomaticMove([from, to, promotion as string]).execute();
+                    } catch (e) {
+                        console.error('AutoMove failed:', e);
+                    }
                 }, options.autoMoveDelay);
             }
+            (window as any).__chessmintSkipAutoMove = false;
         }
     }
 }
 
 function Initialize(chessBoard: HTMLElement) {
     // register the options listener and request saved options
-    optionsRegisterInjectedScript();
-    new ChessMint(chessBoard);
+    optionsRegisterInjectedScript(() => {
+        new ChessMint(chessBoard);
+    });
 }
 
 const observer = new MutationObserver(async function (mutations) {
@@ -178,4 +189,3 @@ customElements
             return "wc-move-list";
         };
     });
-

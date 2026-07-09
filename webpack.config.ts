@@ -9,6 +9,7 @@ import {
     EntryObject,
     RuleSetRule,
     WebpackPluginInstance,
+    DefinePlugin,
 } from "webpack";
 import * as crypto from "node:crypto";
 
@@ -117,6 +118,11 @@ export default (env: { [index: string]: boolean }) => {
     };
 
     const plugins: WebpackPluginInstance[] = [
+        new DefinePlugin({
+            __VUE_OPTIONS_API__: true,
+            __VUE_PROD_DEVTOOLS__: false,
+            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+        }),
         new VueLoaderPlugin(),
         new HtmlWebpackPlugin({
             chunks: ["popup"],

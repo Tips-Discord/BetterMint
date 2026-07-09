@@ -5,7 +5,11 @@ import { EClassification, IChessboard } from "./types/chessboard";
 import eco from "./assets/ecotable.json";
 import { onOptionsUpdated, options } from "./options";
 
-const ecoSet = new Set(eco as string[]);
+let ecoSet: Set<string> | null = null;
+const inEco = (fen: string): boolean => {
+    if (!ecoSet) ecoSet = new Set(eco as string[]);
+    return ecoSet.has(fen);
+};
 
 const materialValues: Record<string, number> = {
     p: 1, n: 3, b: 3, r: 5, q: 9,
@@ -29,11 +33,20 @@ export interface IPrincipalVariation extends IEnginePv {
     lineSan: TSANotation[];
 }
 
+const pvCache = new Map<string, { san: string; lineSan: string[] }>();
+const PV_CACHE_MAX = 128;
+
 let convertEnginePv = (() => {
     let chess: Chess | null = null;
     let lastFen = '';
 
     return (fen: string, pv: IEnginePv): IPrincipalVariation => {
+        const key = fen + '|' + (pv.line[0] ?? '');
+        const cached = pvCache.get(key);
+        if (cached) {
+            return { ...pv, san: cached.san, lineSan: cached.lineSan };
+        }
+
         if (!chess || lastFen !== fen) {
             chess = new Chess();
             chess.load(fen);
@@ -46,6 +59,12 @@ let convertEnginePv = (() => {
         for (let i = 0; i < moveCount; i++) {
             chess!.undo();
         }
+
+        // Evict oldest if cache too large
+        if (pvCache.size >= PV_CACHE_MAX) {
+            pvCache.delete(pvCache.keys().next().value!);
+        }
+        pvCache.set(key, { san: lineSan[0], lineSan });
 
         return {
             ...pv,
@@ -77,7 +96,7 @@ export class Line {
     ) {
         const shortFen = fen.split(" ").slice(0, 3).join(" ");
         this.pvs = [];
-        this.isInTheory = ecoSet.has(shortFen);
+        this.isInTheory = inEco(shortFen);
         this.fen = fen;
         this.lan = lan;
         this.san = san;

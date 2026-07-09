@@ -1,4 +1,7 @@
 node_modules/
 dist/
-.learnings
 chess.txt
+.chesscom-js
+.env
+scripts
+testing

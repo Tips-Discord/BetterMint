@@ -13,7 +13,7 @@ wsDev.addEventListener("message", (event) => {
 /// #endif
 optionsRegisterContentScript();
 
-// --- WebSocket bridge ---
+// WebSocket bridge
 let bridgeSocket: WebSocket | null = null;
 
 window.addEventListener('ChessMintWsConnect', ((e: CustomEvent) => {
@@ -33,7 +33,7 @@ window.addEventListener('ChessMintWsSend', ((e: CustomEvent) => {
     }
 }) as EventListener);
 
-// --- Worker bridge ---
+// Worker bridge
 const workers = new Map<string, Worker>();
 
 window.addEventListener('ChessMintWorkerCreate', ((e: CustomEvent) => {

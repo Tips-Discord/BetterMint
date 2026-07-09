@@ -227,6 +227,22 @@ export interface IGamePluginManager {
     setCreatePluginContext(e: any): void;
 }
 
+export interface IGameMode {
+    name: string;
+    isAllowedToMove?(): boolean;
+    getOptions(): IGameModeOptions;
+    setOption?(key: string, value: any): void;
+}
+
+export interface IGameModeOptions {
+    canAddMovesToMainLine?: boolean;
+    canMoveWhenGameIsOver?: boolean;
+    canMoveWhenNotPlayerTurn?: boolean;
+    canModifyExistingMovesOnMainLine?: boolean;
+    usePlayingAs?: boolean;
+    [key: string]: any;
+}
+
 export interface IGame {
     // move a piece on the board
     move(move: IMoveDetail): void;
@@ -269,9 +285,11 @@ export interface IGame {
 
     // get current turn, 1 is white, 2 is black
     getTurn(): number;
+    getPlayingAs(): number | undefined;
+    setPlayingAs?(color: number): void;
 
-    // get current side, 1 is white, 2 is black
-    getPlayingAs(): number;
+    // get the current game mode (playing, analysis, observing, etc.)
+    getMode(): IGameMode;
 
     // get all legal moves on the board
     getLegalMoves(): IMoveDetail[];

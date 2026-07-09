@@ -7,33 +7,6 @@ export class AutomaticMove {
         this.domain = window.location.hostname.replace(/^www\./, '');
     }
 
-    private _isMyTurn() {
-        if (this.domain !== 'chess.com') return true;
-        const board = this._getBoardElement();
-        if (!board) return false;
-
-        const isFlipped = board.classList.contains('flipped');
-        const myColor = isFlipped ? 'black' : 'white';
-        const clocks = Array.from(document.querySelectorAll('.clock-component'));
-        if (clocks.length < 2) return false;
-
-        const activeClock = clocks.find(c =>
-            c.classList.contains('clock--turn') ||
-            c.classList.contains('clock-player-turn') ||
-            c.querySelector('.clock-running')
-        );
-        if (!activeClock) return false;
-
-        const activeIndex = clocks.indexOf(activeClock);
-        const activePlayerIsWhite = activeIndex === 0;
-        let isMyTurn = (myColor === 'black' && !activePlayerIsWhite);
-
-        if (!isFlipped && myColor === 'white' && !activePlayerIsWhite)
-            isMyTurn = true;
-
-        return isMyTurn;
-    }
-
     private _getBoardElement() {
         return document.querySelector('wc-chess-board') ||
                document.querySelector('#board-layout-chessboard .board') ||
@@ -55,12 +28,9 @@ export class AutomaticMove {
         const sqW = rect.width / 8;
         const sqH = rect.height / 8;
 
-        const offsetX = (Math.random() - 0.5) * 2;
-        const offsetY = (Math.random() - 0.5) * 2;
-
         return {
-            x: rect.left + (finalFile * sqW) + (sqW / 2) + offsetX,
-            y: rect.top + (finalRank * sqH) + (sqH / 2) + offsetY
+            x: rect.left + (finalFile * sqW) + (sqW / 2),
+            y: rect.top + (finalRank * sqH) + (sqH / 2)
         };
     }
 
@@ -74,126 +44,125 @@ export class AutomaticMove {
         }));
     }
 
-    private _handlePromotion(promotion?: string) {
-        const modal =
-            document.querySelector('.promotion-window') ||
-            document.querySelector('[data-cy="promotion-window"]');
-        if (!modal) return false;
+    private _selectPromotionPiece(pieceType: string): boolean {
+        const idx2D: Record<string, number> = { b: 0, n: 1, q: 2, r: 3 };
 
-        const pieceType = promotion || 'q';
-        const pieceMap: Record<string, string[]> = {
-            q: ['[data-piece$="Q"]', '[data-piece="wq"]', '[data-piece="bq"]', '.wq', '.bq', 'piece.queen'],
-            r: ['[data-piece$="R"]', '[data-piece="wr"]', '[data-piece="br"]', '.wr', '.br'],
-            b: ['[data-piece$="B"]', '[data-piece="wb"]', '[data-piece="bb"]', '.wb', '.bb'],
-            n: ['[data-piece$="N"]', '[data-piece="wn"]', '[data-piece="bn"]', '.wn', '.bn'],
-        };
+        // 3D renderer
+        const el3d = document.querySelector(
+            `.promotion-piece[data-pieceType="${pieceType}"]`
+        );
+        if (el3d && (el3d as HTMLElement).offsetParent !== null) {
+            el3d.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true, cancelable: true, view: window,
+                pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1
+            }));
+            return true;
+        }
 
-        const selectors = pieceMap[pieceType] || pieceMap.q;
-        for (const sel of selectors) {
-            const el = modal.querySelector(sel);
-            if (el) {
-                (el as HTMLElement).click();
+        // 2D renderer
+        const all = document.querySelectorAll('.promotion-piece');
+        if (all.length === 4 && !(all[0] as HTMLElement).getAttribute('data-pieceType')) {
+            const el2d = all[idx2D[pieceType] || 2] as HTMLElement;
+            if (el2d.offsetParent !== null) {
+                el2d.dispatchEvent(new PointerEvent('pointerdown', {
+                    bubbles: true, cancelable: true, view: window,
+                    pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1
+                }));
                 return true;
             }
         }
 
-        // fallback: search all promotion pieces by class and click the best available
-        const pieces = modal.querySelectorAll('.promotion-piece, [class*="piece"]');
-        const valueOrder = ['q', 'r', 'b', 'n'];
-        const startIdx = valueOrder.indexOf(pieceType);
-        for (let i = startIdx; i < valueOrder.length; i++) {
-            for (const piece of pieces) {
-                const cls = piece.className.toLowerCase();
-                const dataPiece = (piece as HTMLElement).getAttribute('data-piece')?.toLowerCase() || '';
-                if (cls.includes(valueOrder[i]) || dataPiece.endsWith(valueOrder[i].toUpperCase())) {
-                    (piece as HTMLElement).click();
+        return false;
+    }
+
+    private _isMyTurn(): boolean {
+        const checkTurn = (): boolean => {
+            if (this.domain !== 'chess.com') return true;
+
+            const board = this._getBoardElement();
+            if (!board) return false;
+
+            const game = (board as any)?.game;
+            if (!game) return false;
+
+            // Game over -> never move.
+            if (typeof game.isGameOver === 'function' && game.isGameOver()) {
+                return false;
+            }
+
+            try {
+                const mode = typeof game.getMode === 'function' ? game.getMode() : null;
+                if (mode && typeof mode.isAllowedToMove === 'function') {
+                    return !!mode.isAllowedToMove();
+                }
+            } catch {
+                // fall through to manual check
+            }
+
+            if (typeof game.getPlayingAs === 'function' && typeof game.getTurn === 'function') {
+                const playingAs = game.getPlayingAs();
+                if (playingAs === undefined || playingAs === null) {
                     return true;
                 }
+                return playingAs === game.getTurn();
             }
-        }
 
-        return false;
+            return true;
+        };
+
+        const isMyTurn = checkTurn();
+        // this returns true only on our turn but i have no idea why :/
+        // i might just be stupid so yeah. but atleast it "works" for now. if it breaks in the future, this is probably the culprit.
+        // console.log(`Is it my turn?`, isMyTurn, `[${performance.now().toFixed(0)}ms]`);
+        return isMyTurn;
     }
 
-    private _isGameOver() {
-        return !!(
-            document.querySelector('[data-cy="game-over-modal-content"]') ||
-            document.querySelector('.game-over-modal') ||
-            document.querySelector('game-result-header') ||
-            document.querySelector('[data-cy="game-result"]')
-        );
-    }
-
-    async execute(maxRetries = 3, retryDelayMs = 40, postClickWaitMs = 10) {
-        (window as any)._autoMoveExecutionId = ((window as any)._autoMoveExecutionId || 0) + 1;
-        const myExecutionId = (window as any)._autoMoveExecutionId;
-        const isAborted = () => myExecutionId !== (window as any)._autoMoveExecutionId;
-
+    async execute() {
+        const from = this.fenMoveArr[0];
+        const to = this.fenMoveArr[1];
         const promotion = this.fenMoveArr[2];
 
-        let turnWaitAttempts = 0;
-        while (!this._isMyTurn() && turnWaitAttempts < 50) {
-            if (isAborted()) return false;
-            await new Promise(r => setTimeout(r, 10));
-            turnWaitAttempts++;
-        }
+        const startSquare = this._resolveSquare(from);
+        const endSquare = this._resolveSquare(to);
+        if (!startSquare || !endSquare) return false;
 
-        if (isAborted()) return false;
-        if (this._isGameOver()) return false;
+        if (!this._isMyTurn()) return false;
 
-        let attempt = 0;
+        (window as any).__chessmintAutoMoving = true;
 
-        while (attempt < maxRetries) {
-            attempt++;
+        if (promotion) {
+            this._dispatch('pointerdown', startSquare.x, startSquare.y, 1);
+            await new Promise(r => setTimeout(r, 15));
 
-            if (this._isGameOver()) return false;
-            if (this._isMyTurn()) {
-                const startSquare = this._resolveSquare(this.fenMoveArr[0]);
-                const endSquare = this._resolveSquare(this.fenMoveArr[1]);
-
-                if (startSquare && endSquare) {
-                    this._dispatch('pointerdown', startSquare.x, startSquare.y, 1);
-                    this._dispatch('pointerup', startSquare.x, startSquare.y, 0);
-                    this._dispatch('click', startSquare.x, startSquare.y, 0);
-
-                    if (isAborted()) return false;
-                    await new Promise(r => setTimeout(r, 10));
-
-                    this._dispatch('pointerdown', endSquare.x, endSquare.y, 1);
-                    this._dispatch('pointerup', endSquare.x, endSquare.y, 0);
-                    this._dispatch('click', endSquare.x, endSquare.y, 0);
-
-                    if (isAborted()) return false;
-                    await new Promise(r => setTimeout(r, postClickWaitMs));
-
-                    if (this._handlePromotion(promotion)) {
-                        if (isAborted()) return false;
-                        await new Promise(r => setTimeout(r, postClickWaitMs));
-                    }
-
-                    let verifyAttempts = 0;
-                    let moveRegistered = false;
-                    while (verifyAttempts < 25) {
-                        if (isAborted()) return false;
-                        if (!this._isMyTurn()) {
-                            moveRegistered = true;
-                            break;
-                        }
-                        await new Promise(r => setTimeout(r, 10));
-                        verifyAttempts++;
-                    }
-
-                    if (moveRegistered) {
-                        return true;
-                    }
-                }
+            // Drag to destination
+            const steps = 3;
+            for (let s = 1; s <= steps; s++) {
+                const t = s / steps;
+                this._dispatch('pointermove',
+                    startSquare.x + (endSquare.x - startSquare.x) * t,
+                    startSquare.y + (endSquare.y - startSquare.y) * t, 1);
+                await new Promise(r => setTimeout(r, 5));
             }
 
-            if (attempt >= maxRetries || isAborted()) return false;
+            this._dispatch('pointerup', endSquare.x, endSquare.y, 0);
 
-            await new Promise(r => setTimeout(r, retryDelayMs));
+            // Poll for promotion piece
+            for (let i = 0; i < 15; i++) {
+                if (this._selectPromotionPiece(promotion || 'q')) break;
+                await new Promise(r => setTimeout(r, 10));
+            }
+        } else {
+            this._dispatch('pointerdown', startSquare.x, startSquare.y, 1);
+            this._dispatch('pointerup', startSquare.x, startSquare.y, 0);
+            this._dispatch('click', startSquare.x, startSquare.y, 0);
+
+            await new Promise(r => setTimeout(r, 5));
+
+            this._dispatch('pointerdown', endSquare.x, endSquare.y, 1);
+            this._dispatch('pointerup', endSquare.x, endSquare.y, 0);
+            this._dispatch('click', endSquare.x, endSquare.y, 0);
         }
 
-        return false;
+        return true;
     }
 }

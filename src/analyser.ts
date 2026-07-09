@@ -274,26 +274,25 @@ function moveGrade(difference: number, currentScore: number) {
     };
 }
 
+// Precompute sdiff cutoffs for values 0-20 (input is always clamped to this range)
+const sdiffLookup: number[][] = (() => {
+    const table: number[][] = [];
+    for (let v = 0; v <= 20; v++) {
+        const v2 = v * v;
+        const v3 = v2 * v;
+        table.push([
+            0.001776052 * v3 + -0.018218136 * v2 + 0.303967449 * v + 2,
+            0.001304692 * v3 + -0.011609068 * v2 + 0.205317058 * v + 1.1,
+            4461266e-10 * v3 + 0.0041181833 * v2 + 0.0141864828 * v + 0.5,
+            2172109e-10 * v3 + -0.0010745878 * v2 + 0.0295840731 * v + 0.1,
+            0,
+        ]);
+    }
+    return table;
+})();
+
 function generateSdiffCutoffs(value: number) {
-    return [
-        0.001776052 * Math.pow((value = Math.min(20, Math.abs(value))), 3) +
-            -0.018218136 * Math.pow(value, 2) +
-            0.303967449 * value +
-            2,
-        0.001304692 * Math.pow(value, 3) +
-            -0.011609068 * Math.pow(value, 2) +
-            0.205317058 * value +
-            1.1,
-        4461266e-10 * Math.pow(value, 3) +
-            0.0041181833 * Math.pow(value, 2) +
-            0.0141864828 * value +
-            0.5,
-        2172109e-10 * Math.pow(value, 3) +
-            -0.0010745878 * Math.pow(value, 2) +
-            0.0295840731 * value +
-            0.1,
-        0,
-    ];
+    return sdiffLookup[Math.min(20, Math.abs(value)) | 0];
 }
 
 // function determineScenarios(e: any) {
