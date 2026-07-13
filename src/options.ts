@@ -23,8 +23,9 @@ export interface IOptions {
     autoMoveDelay: number;
 }
 
-const hasChromeStorageAccess = chrome && chrome.storage && chrome.storage.sync;
-const hasChromeTabsAccess = hasChromeStorageAccess && chrome.tabs;
+const chromeApi = typeof chrome !== "undefined" ? chrome : undefined;
+const hasChromeStorageAccess = !!chromeApi?.storage?.sync;
+const hasChromeTabsAccess = hasChromeStorageAccess && !!chromeApi?.tabs;
 let onUpdateCallbacks: FuncOptsCallback[] = [];
 
 // default options
