@@ -57,7 +57,7 @@ function setOptions(opts: IOptions) {
 export function requestOptions(callback?: { (): void }) {
 
     if (hasChromeStorageAccess) {
-        chrome.storage.sync.get<IOptions>(options, function (opts: IOptions) {
+        chromeApi!.storage.sync.get<IOptions>(options, function (opts: IOptions) {
             setOptions(opts);
             if (callback) callback();
         });
@@ -107,7 +107,7 @@ export function optionsRegisterContentScript() {
     })
 
     // from popup to content script
-    chrome.runtime.onMessage.addListener((request: IOptions) => {
+    chromeApi!.runtime.onMessage.addListener((request: IOptions) => {
         setOptions(request);
     });
 
@@ -140,11 +140,11 @@ watch(options, (first, second) => {
 
     // only update the storage from popup
     if (hasChromeTabsAccess) {
-        chrome.storage.sync.set(options);
-        chrome.tabs.query({}, function (tabs: chrome.tabs.Tab[]) {
+        chromeApi!.storage.sync.set(options);
+        chromeApi!.tabs.query({}, function (tabs: chrome.tabs.Tab[]) {
             tabs.forEach(function (tab: chrome.tabs.Tab) {
                 if (tab.id) {
-                    chrome.tabs.sendMessage<IOptions>(
+                    chromeApi!.tabs.sendMessage<IOptions>(
                         tab.id,
                         Object.assign({}, options)
                     ).catch(() => {})
