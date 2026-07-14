@@ -164,6 +164,10 @@ export default (env: { [index: string]: boolean }) => {
         mode: isDevelopment ? "development" : "production",
         entry: entries,
         watch: isDevelopment,
+        watchOptions: {
+            ignored: /node_modules|[\\/](pagefile|hiberfil|swapfile)\.sys$/i,
+            followSymlinks: false,
+        },
         devtool: isDevelopment ? "inline-source-map" : false,
         module: {
             rules: [
