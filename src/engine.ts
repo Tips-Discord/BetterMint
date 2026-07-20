@@ -48,8 +48,14 @@ export class Engine {
     private externalUrl: string = "";
     private stockfishBlobUrl?: string;
     private isDestroyed: boolean = false;
+    private connectionGeneration: number = 0;
 
     private resolveStockfishUrl(): string {
+        if (!stockfishSrc || !wasmUrl) {
+            console.error("Stockfish assets not available: stockfishSrc or wasmUrl is missing");
+            return "";
+        }
+
         const wasmDataUrl = wasmUrl.replace('application/wasm', 'application/octet-stream');
         const patched = stockfishSrc.replace(
             /['"]stockfish\.wasm['"]/,
@@ -103,6 +109,23 @@ export class Engine {
             worker.onmessage = (e: MessageEvent<string>) => {
                 this.processMessage(e);
             };
+            worker.onerror = (e: ErrorEvent) => {
+                console.error("Stockfish worker error:", e.message);
+                (window as any).toaster?.add?.({
+                    id: "chess.com",
+                    duration: 5000,
+                    icon: "circle-exclamation",
+                    content: `Stockfish engine error: ${e.message || "unknown"}`,
+                })?.catch(() => {});
+                this.isLoaded = false;
+                this.isReady = false;
+                this.isEvaluating = false;
+                if (this.bestmoveCallback) {
+                    const cb = this.bestmoveCallback;
+                    this.bestmoveCallback = undefined;
+                    cb();
+                }
+            };
             this.worker = worker;
         } catch (e) {
             console.error("Failed to load stockfish:", e);
@@ -138,6 +161,14 @@ export class Engine {
             this.updateOptions();
         }
         bridge.onerror = () => {
+            this.isLoaded = false;
+            this.isReady = false;
+            this.isEvaluating = false;
+            if (this.bestmoveCallback) {
+                const cb = this.bestmoveCallback;
+                this.bestmoveCallback = undefined;
+                cb();
+            }
             (window as any).toaster?.add?.({
                 id: "chess.com",
                 duration: 5000,
@@ -157,8 +188,22 @@ export class Engine {
                 this.isReady = false;
             }
 
+            this.isEvaluating = false;
+            this.isRequestedStop = false;
+            if (this.readyCallback) {
+                const cb = this.readyCallback;
+                this.readyCallback = undefined;
+                cb();
+            }
+            if (this.bestmoveCallback) {
+                const cb = this.bestmoveCallback;
+                this.bestmoveCallback = undefined;
+                cb();
+            }
+
             if (this.isDestroyed) return;
 
+            this.connectionGeneration++;
             const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
             this.reconnectAttempts++;
             this.reconnectTimer = setTimeout(() => this.connectExternal(), delay);
@@ -261,10 +306,14 @@ export class Engine {
         } else if (worker instanceof WsBridge) {
             if (worker.readyState === WebSocket.OPEN) {
                 worker.send(cmd);
+            } else {
+                // console.warn(`Dropped command "${cmd}": WebSocket bridge not open (state=${worker.readyState})`);
             }
         } else if (worker instanceof WebSocket) {
             if (worker.readyState === WebSocket.OPEN) {
                 worker.send(cmd);
+            } else {
+                // console.warn(`Dropped command "${cmd}": WebSocket not open (state=${worker.readyState})`);
             }
         }
     }
@@ -384,6 +433,10 @@ export class Engine {
                 }
 
                 this.isRequestedStop = false;
+            } else if (line.startsWith("error")) {
+                // console.warn("Engine error:", line);
+            } else {
+                // console.debug("Unhandled engine line:", line);
             }
         }
     }
