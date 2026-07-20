@@ -334,6 +334,23 @@ export class Line {
         return ((this.winChance - 1) / 2) * -100;
     }
 
+    public getWinChances(): { white: number; draw: number; black: number } {
+        const white = this.getWinChance("w");
+        const black = this.getWinChance("b");
+
+        let draw = 0;
+        if (this.pvs.length > 0 && !this.pvs[0].isMate) {
+            const absCp = Math.abs(this.pvs[0].absoluteScore);
+            draw = Math.max(0, 1 - absCp / 800) * (100 - white - black);
+        }
+
+        return {
+            white: Math.round(white),
+            draw: Math.round(draw),
+            black: Math.round(black),
+        };
+    }
+
     public isMate(forColor?: TPieceColor): boolean {
         if (this.pvs.length == 0) return false;
         if (!this.pvs[0].isMate) return false;

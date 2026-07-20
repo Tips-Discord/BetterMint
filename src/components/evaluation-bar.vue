@@ -9,6 +9,10 @@ const evaluation = computed(() => {
     return data.currentLine?.getEvaluation() ?? { score: 0, isMate: false }
 })
 
+const winChances = computed(() => {
+    return data.currentLine?.getWinChances() ?? { white: 50, draw: 0, black: 50 }
+})
+
 defineProps({
     isFlipped: {
         type: Boolean
@@ -49,6 +53,24 @@ function getTransform(evaluation: IAbsEvaluation) {
             <span :class="[$style.score, evaluation.score >= 0 ? $style.darkScore : $style.lightScore]">
                 {{ evaluationToString(evaluation, false) }}
             </span>
+
+            <div :class="$style.wdlTooltip">
+                <div :class="[$style.wdlRow, $style.wdlWhite]">
+                    <span :class="$style.wdlDot"></span>
+                    <span :class="$style.wdlLabel">White</span>
+                    <span :class="$style.wdlValue">{{ winChances.white }}%</span>
+                </div>
+                <div :class="[$style.wdlRow, $style.wdlDraw]">
+                    <span :class="$style.wdlDot"></span>
+                    <span :class="$style.wdlLabel">Draw</span>
+                    <span :class="$style.wdlValue">{{ winChances.draw }}%</span>
+                </div>
+                <div :class="[$style.wdlRow, $style.wdlBlack]">
+                    <span :class="$style.wdlDot"></span>
+                    <span :class="$style.wdlLabel">Black</span>
+                    <span :class="$style.wdlValue">{{ winChances.black }}%</span>
+                </div>
+            </div>
 
             <div :class="$style.fill">
                 <div :class="[$style.color, $style.black]"></div>
@@ -176,10 +198,100 @@ function getTransform(evaluation: IAbsEvaluation) {
         color: #fff;
     }
 
+    &:hover .wdlTooltip {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(calc(var(--barWidth) + 8px), -50%);
+    }
+
     &.flipped, &.flipped .scoreAbbreviated {
         transform: rotate(180deg);
         --scoreTransform: rotate(180deg);
     }
+}
+
+.wdlTooltip {
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    left: 0;
+    opacity: 0;
+    padding: 10px 14px;
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    transform: translate(calc(var(--barWidth) + 4px), -50%);
+    transition: opacity 0.2s, transform 0.2s;
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.wdlRow {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.wdlDot {
+    border-radius: 50%;
+    height: 8px;
+    width: 8px;
+    flex-shrink: 0;
+}
+
+.wdlWhite .wdlDot {
+    background-color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wdlDraw .wdlDot {
+    background-color: #777574;
+}
+
+.wdlBlack .wdlDot {
+    background-color: #403d39;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wdlLabel {
+    color: #a0a0a0;
+    min-width: 36px;
+}
+
+.wdlWhite .wdlLabel {
+    color: #e0e0e0;
+}
+
+.wdlDraw .wdlLabel {
+    color: #909090;
+}
+
+.wdlBlack .wdlLabel {
+    color: #707070;
+}
+
+.wdlValue {
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.wdlWhite .wdlValue {
+    color: #ffffff;
+}
+
+.wdlDraw .wdlValue {
+    color: #b0b0b0;
+}
+
+.wdlBlack .wdlValue {
+    color: #808080;
 }
 
 

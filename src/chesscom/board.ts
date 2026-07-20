@@ -11,7 +11,7 @@ import { AnalysisUI } from "../analysis-ui";
 import { TEffectType, IMarking, IBoardElement, IGamePlugin, IGameEvent, IMoveDetail, IGameHistory, IGame } from "@/types/chess.com";
 import { Icons } from "@/assets/icons";
 
-function getLAN(from: string, to: string, promotion?: string) {
+function getLAN(from: TSquare, to: TSquare, promotion?: TPromotionPiece): TLANotation {
     let lan = from + to;
     if (promotion) {
         lan += promotion;
@@ -294,7 +294,7 @@ export class ChessComBoard implements IChessboard {
         // check if the game continues at the current line, in analysis mode
         // the user can move into a different line/position
         if (data.lineDiff == 0) {
-            let lan = getLAN(data.move.from, data.move.to, data.move.promotion);
+            let lan = getLAN(data.move.from as TSquare, data.move.to as TSquare, data.move.promotion as TPromotionPiece);
             this.handler.onMove(lan);
             return;
         }
